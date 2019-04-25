@@ -12,9 +12,10 @@ type cmd func(*discord.Session, *discord.MessageCreate, []string)
 
 // Command is a struct holding info about a command and the command itself
 type Command struct {
-	Name string
-	Doc  string
-	Call cmd
+	Name     string
+	ShortDoc string
+	LongDoc  string
+	Call     cmd
 }
 
 // AddAliases adds an alias for a command
@@ -25,8 +26,8 @@ func (c *Command) AddAliases(aliases []string) {
 }
 
 // AddCommand adds a command to the list
-func AddCommand(name string, doc string, c cmd) *Command {
-	command := &Command{name, doc, c}
+func AddCommand(name, shortDoc, longDoc string, c cmd) *Command {
+	command := &Command{name, shortDoc, longDoc, c}
 	Commands[name] = command
 	return command
 }

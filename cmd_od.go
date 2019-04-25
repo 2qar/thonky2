@@ -16,7 +16,8 @@ const (
 )
 
 func init() {
-	AddCommand("od", "Get information about another team or a round of Open Division", OD)
+	longDoc := "Examples:\n\n!od 1\n\tGet info on the other team in round 1.\n!od cloud9\n\tGet info on cloud9, if they're in our tournament."
+	AddCommand("od", "Get information about another team or a round of Open Division", longDoc, OD)
 }
 
 // OD grabs information about another team

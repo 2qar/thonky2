@@ -9,7 +9,8 @@ import (
 )
 
 func init() {
-	AddCommand("get", "Get information from the set spreadsheet", Get)
+	longDoc := "Examples:\n\n!get week\n\tShow the schedule for this week."
+	AddCommand("get", "Get information from the configured spreadsheet.", longDoc, Get)
 }
 
 // Get formats information from a given spreadsheet into a Discord embed.

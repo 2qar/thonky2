@@ -66,14 +66,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	if strings.HasPrefix(m.Content, "!") {
 		args := strings.Split(m.Content, " ")
-		if len(args) > 1 {
-			for name, command := range Commands {
-				if string(args[0][1:]) == name {
-					command.Call(s, m, args)
-				}
+		for name, command := range Commands {
+			if string(args[0][1:]) == name {
+				command.Call(s, m, args)
 			}
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "No args.")
 		}
 	}
 }
