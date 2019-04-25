@@ -21,7 +21,26 @@ var (
 
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
+
+	// guildInfo holds the config for each guild the bot is in
+	guildInfo = make(map[string]*GuildInfo)
 )
+
+// GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
+func GetInfo(guildID, channelID string) (BaseInfo, error) {
+	info := guildInfo[guildID]
+	if info != (&GuildInfo{}) {
+		for _, team := range info.Teams {
+			for _, id := range team.Channels {
+				if string(id) == channelID {
+					return team, nil
+				}
+			}
+			return info, nil
+		}
+	}
+	return &GuildInfo{}, fmt.Errorf("no GuildInfo for guild [%s]", guildID)
+}
 
 func init() {
 	flag.StringVar(&Token, "t", "", "Bot token")
@@ -40,6 +59,7 @@ func main() {
 	}
 
 	d.AddHandler(messageCreate)
+	d.AddHandler(ready)
 
 	err = d.Open()
 	if err != nil {
@@ -57,6 +77,18 @@ func main() {
 	<-sc
 
 	d.Close()
+}
+
+func ready(s *discordgo.Session, r *discordgo.Ready) {
+	for _, guild := range r.Guilds {
+		info, err := GetGuildInfo(guild.ID)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		guildInfo[guild.ID] = info
+		fmt.Println("added config for", guild.ID)
+	}
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
