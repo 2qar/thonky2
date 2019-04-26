@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/bigheadgeorge/odscraper"
 	"github.com/bwmarrin/discordgo"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -35,7 +36,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			if strings.HasPrefix(err.Error(), "unable to find team") {
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Unable to find team \"%s\"", name))
 			} else {
-				fmt.Println(err)
+				log.Println(err)
 				return
 			}
 		}
@@ -57,7 +58,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	} else {
 		t, err := odscraper.GetOtherTeam(tournamentLink, teamID, num)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("No data for round %d. :(", num))
 			return
 		}

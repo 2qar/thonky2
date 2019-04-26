@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/bigheadgeorge/thonky2/db"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
+	"log"
 )
 
 // BaseInfo acts as the crappy interface for TeamInfo and GuildInfo, but it works :)
@@ -47,7 +47,7 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 		if config.DocKey.Valid {
 			sheet, err = Service.FetchSpreadsheet(config.DocKey.String)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 		}
 		return &TeamInfo{&sheet, config}

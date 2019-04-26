@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -26,20 +27,20 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 
 	if len(args) == 2 {
 		if args[1] == "week" {
-			fmt.Println("getting week")
+			log.Println("getting week")
 			week, err := GetWeek(info.Sheet)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
 			}
 			embed := formatWeek(s, week, info.SheetLink())
 			for _, field := range embed.Fields {
-				fmt.Println(*field)
+				log.Println(*field)
 			}
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
 			}
-			fmt.Println("sent week :)")
+			log.Println("sent week :)")
 		}
 	}
 }
