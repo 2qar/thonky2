@@ -1,9 +1,11 @@
 package main
 
 import (
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -55,6 +57,17 @@ func init() {
 	}
 }
 
+func openLog(path string) (*os.File, error) {
+	if _, err := os.Open(path); os.IsNotExist(err) {
+		_, err = os.Create(path)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend|0644)
+}
+
 func main() {
 	d, err := discordgo.New("Bot " + Token)
 	if err != nil {
@@ -79,13 +92,8 @@ func main() {
 	}
 	year, month, day := time.Now().Date()
 	logName := fmt.Sprintf("%d-%d-%d.log", year, month, day)
-	if _, err := os.Open("logs/" + logName); os.IsNotExist(err) {
-		_, err = os.Create("logs/" + logName)
-		if err != nil {
-			panic(err)
-		}
-	}
-	logFile, err := os.OpenFile("logs/"+logName, os.O_APPEND|os.O_WRONLY, os.ModeAppend|0644)
+	logPath := "logs/" + logName
+	logFile, err := openLog(logPath)
 	if err != nil {
 		panic(err)
 	}
@@ -97,6 +105,34 @@ func main() {
 	<-sc
 
 	d.Close()
+
+	err = logFile.Close()
+	if err != nil {
+		panic(err)
+	}
+	f, err := openLog(logPath + ".gz")
+	if err != nil {
+		panic(err)
+	}
+	l, err := os.Open(logPath)
+	if err != nil {
+		panic(err)
+	}
+	b, err := ioutil.ReadAll(l)
+	if err != nil {
+		panic(err)
+	}
+	l.Close()
+	gz := gzip.NewWriter(f)
+	gz.Write(b)
+	err = gz.Close()
+	if err != nil {
+		panic(err)
+	}
+	err = os.Remove(logPath)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
