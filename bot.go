@@ -27,7 +27,7 @@ var (
 )
 
 // GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
-func GetInfo(guildID, channelID string) (BaseInfo, error) {
+func GetInfo(guildID, channelID string) (*TeamInfo, error) {
 	info := guildInfo[guildID]
 	if info != (&GuildInfo{}) {
 		for _, team := range info.Teams {
@@ -36,10 +36,10 @@ func GetInfo(guildID, channelID string) (BaseInfo, error) {
 					return team, nil
 				}
 			}
-			return info, nil
+			return info.TeamInfo, nil
 		}
 	}
-	return &GuildInfo{}, fmt.Errorf("no GuildInfo for guild [%s]", guildID)
+	return &TeamInfo{}, fmt.Errorf("no info for guild [%s]", guildID)
 }
 
 func init() {

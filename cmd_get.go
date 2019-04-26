@@ -15,18 +15,23 @@ func init() {
 
 // Get formats information from a given spreadsheet into a Discord embed.
 func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info, err := GetInfo(m.GuildID, m.ChannelID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
+		return
+	} else if !info.DocKey.Valid {
+		s.ChannelMessageSend(m.ChannelID, "No doc key for this guild.")
+		return
+	}
+
 	if len(args) == 2 {
 		if args[1] == "week" {
 			fmt.Println("getting week")
-			spreadsheet, err := Service.FetchSpreadsheet(SheetID)
+			week, err := GetWeek(info.Sheet)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
 			}
-			week, err := GetWeek(&spreadsheet)
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, err.Error())
-			}
-			embed := formatWeek(s, week, "https://docs.google.com/spreadsheets/d/19LIrH878DY9Ltaux3KlfIenmMFfPTA16NWnnQQMHG0Y/edit")
+			embed := formatWeek(s, week, info.SheetLink())
 			for _, field := range embed.Fields {
 				fmt.Println(*field)
 			}
