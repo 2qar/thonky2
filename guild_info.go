@@ -13,7 +13,9 @@ type BaseInfo interface {
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
-	Sheet *spreadsheet.Spreadsheet
+	Sheet   *spreadsheet.Spreadsheet
+	Players []*Player
+	Week    *Week
 	*db.TeamConfig
 }
 
@@ -44,13 +46,26 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
 		var sheet spreadsheet.Spreadsheet
 		var err error
+		teamInfo := &TeamInfo{TeamConfig: config}
 		if config.DocKey.Valid {
 			sheet, err = Service.FetchSpreadsheet(config.DocKey.String)
 			if err != nil {
 				log.Println(err)
+				return teamInfo
 			}
+			teamInfo.Sheet = &sheet
 		}
-		return &TeamInfo{&sheet, config}
+		teamInfo.Players, err = GetPlayers(&sheet)
+		if err != nil {
+			return teamInfo
+		}
+		log.Println("grabbed players")
+		teamInfo.Week, err = GetWeek(&sheet)
+		if err != nil {
+			return teamInfo
+		}
+		log.Println("grabbed week")
+		return teamInfo
 	}
 	g = &GuildInfo{TeamInfo: getTeamInfo(config)}
 	teams, err := handler.GetTeams(guildID)
