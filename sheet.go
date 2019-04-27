@@ -77,10 +77,10 @@ func getPlayer(s *spreadsheet.Spreadsheet, name string) (Player, error) {
 }
 
 // GetPlayers returns all of the players on a sheet.
-func GetPlayers(s *spreadsheet.Spreadsheet) []*Player {
+func GetPlayers(s *spreadsheet.Spreadsheet) ([]*Player, error) {
 	sheet, err := s.SheetByTitle("Team Availability")
 	if err != nil {
-		panic(err)
+		return []*Player{}, err
 	}
 
 	var wg sync.WaitGroup
@@ -116,7 +116,7 @@ func GetPlayers(s *spreadsheet.Spreadsheet) []*Player {
 		p := <-pCh
 		players = append(players, &p)
 	}
-	return players
+	return players, nil
 }
 
 // GetWeek returns the week schedule on a sheet.
