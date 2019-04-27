@@ -14,6 +14,12 @@ func init() {
 	AddCommand("get", "Get information from the configured spreadsheet.", longDoc, Get)
 }
 
+func logEmbed(e *discordgo.MessageEmbed) {
+	for _, field := range e.Fields {
+		log.Println(*field)
+	}
+}
+
 // Get formats information from a given spreadsheet into a Discord embed.
 func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
@@ -33,14 +39,27 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				return
 			}
 			embed := formatWeek(s, info.Week, info.SheetLink())
-			for _, field := range embed.Fields {
-				log.Println(*field)
-			}
+			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
 			}
 			log.Println("sent week :)")
+		} else if args[1] == "today" {
+			log.Println("getting today")
+			if info.Week == nil {
+				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
+				return
+			} else if info.Players == nil {
+				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
+				return
+			}
+			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), int(time.Now().Weekday())-1)
+			logEmbed(embed)
+			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, err.Error())
+			}
 		}
 	}
 }
@@ -114,6 +133,46 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 			dayName = w.Days[i]
 		}
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: dayName, Value: activityEmojis, Inline: false})
+	}
+
+	return embed
+}
+
+func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day int) *discordgo.MessageEmbed {
+	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
+	addTimeField(embed, "Players", 4)
+
+	for _, player := range p {
+		var roleEmoji string
+		switch player.Role {
+		case "Tanks":
+			roleEmoji = ":shield:"
+		case "DPS":
+			roleEmoji = ":crossed_swords:"
+		case "Supports":
+			roleEmoji = ":ambulance:"
+		case "Coaches":
+			roleEmoji = ":books:"
+		case "Flex":
+			roleEmoji = ":muscle:"
+		}
+
+		var emojis []string
+		for _, response := range player.AvailabilityOn(day) {
+			var emoji string
+			switch response {
+			case "Yes":
+				emoji = ":white_check_mark:"
+			case "Maybe":
+				emoji = ":grey_question:"
+			case "No":
+				emoji = ":x:"
+			}
+			emojis = append(emojis, emoji)
+		}
+		emojiString := strings.Join(emojis, ", ")
+
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji + " " + player.Name, emojiString, false})
 	}
 
 	return embed
