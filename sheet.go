@@ -102,7 +102,7 @@ func GetPlayers(s *spreadsheet.Spreadsheet) ([]*Player, error) {
 				player, _ := getPlayer(s, name)
 				player.Role = role
 				pCh <- player
-			}(name, role)
+			}(name, currentRole)
 			continue
 		}
 		wg.Done()
