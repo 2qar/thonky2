@@ -1,8 +1,9 @@
 package main
 
 import (
-	"flag"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -43,18 +44,25 @@ func GetInfo(guildID, channelID string) (*TeamInfo, error) {
 	return &TeamInfo{}, fmt.Errorf("no info for guild [%s]", guildID)
 }
 
-func init() {
-	flag.StringVar(&Token, "t", "", "Bot token")
-	flag.Parse()
-
-	if Token == "" {
-		flag.Usage()
-		os.Exit(1)
-	}
-}
-
 func main() {
-	d, err := discordgo.New("Bot " + Token)
+	if _, err := os.Open("config.json"); os.IsNotExist(err) {
+		panic(fmt.Errorf("no config file; rename config.json.example to config.json and fill the fields"))
+	}
+	b, err := ioutil.ReadFile("config.json")
+	if err != nil {
+		panic(err)
+	}
+	config := struct {
+		Token string
+	}{}
+	err = json.Unmarshal(b, &config)
+	if err != nil {
+		panic(err)
+	}
+	if config.Token == "" {
+		panic(fmt.Errorf("no token in config.json"))
+	}
+	d, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		panic(err)
 	}
