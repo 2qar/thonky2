@@ -9,10 +9,12 @@ import (
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
+// Container stores cells in a format that fits each day of the week.
 type Container struct {
 	Cells *[7][6]*spreadsheet.Cell
 }
 
+// Values returns the string values of each cell
 func (c *Container) Values() [7][6]string {
 	var values [7][6]string
 	for i, row := range c.Cells {
@@ -23,30 +25,36 @@ func (c *Container) Values() [7][6]string {
 	return values
 }
 
+// Player stores availability for each day and info about the player
 type Player struct {
 	Name string
 	Role string
 	Container
 }
 
+// Week stores the schedule for the week
 type Week struct {
 	Date string
 	Days *[7]string
 	Container
 }
 
+// ActivitiesOn returns the activities for a given day
 func (w *Week) ActivitiesOn(day int) [6]string {
 	return w.Values()[day]
 }
 
+// Availability returns the availability of a player for a week
 func (p *Player) Availability() [7][6]string {
 	return p.Values()
 }
 
+// AvailabilityOn returns the availability of a player on a day
 func (p *Player) AvailabilityOn(day int) [6]string {
 	return p.Availability()[day]
 }
 
+// AvailabilityAt returns the availability of a player at a given time
 func (p *Player) AvailabilityAt(day, time, start int) string {
 	return p.AvailabilityOn(day)[time-start]
 }
@@ -68,6 +76,7 @@ func getPlayer(s *spreadsheet.Spreadsheet, name string) (Player, error) {
 	return p, nil
 }
 
+// GetPlayers returns all of the players on a sheet.
 func GetPlayers(s *spreadsheet.Spreadsheet) []*Player {
 	sheet, err := s.SheetByTitle("Team Availability")
 	if err != nil {
@@ -110,6 +119,7 @@ func GetPlayers(s *spreadsheet.Spreadsheet) []*Player {
 	return players
 }
 
+// GetWeek returns the week schedule on a sheet.
 func GetWeek(s *spreadsheet.Spreadsheet) (*Week, error) {
 	sheet, err := s.SheetByTitle("Weekly Schedule")
 	if err != nil {
