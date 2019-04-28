@@ -24,6 +24,16 @@ func logEmbed(e *discordgo.MessageEmbed) {
 	}
 }
 
+// Weekday returns an ISO-8601 compliant weekday, where Monday is the beginning of the week
+func Weekday() int {
+	today := time.Now().Weekday()
+	if today == 0 {
+		return 6
+	} else {
+		return int(today) - 1
+	}
+}
+
 // Get formats information from a given spreadsheet into a Discord embed.
 func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
@@ -58,7 +68,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
 				return
 			}
-			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), int(time.Now().Weekday())-1)
+			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), Weekday())
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
@@ -125,12 +135,11 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 		return strings.Join(activityEmojis, ", ")
 	}
 
-	today := int(time.Now().Weekday())
 	days := w.Values()
 	for i := 0; i < 7; i++ {
 		activityEmojis := formatDay(days[i])
 		var dayName string
-		if i == today-1 {
+		if i == Weekday() {
 			dayName = "**" + w.Days[i] + "**"
 		} else {
 			dayName = w.Days[i]
