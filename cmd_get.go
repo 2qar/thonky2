@@ -9,6 +9,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+var (
+	timeEmotes = []string{":zero:", ":one:", ":two:", ":three:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:", "<:eleven:548022654540578827>", "<:twelve:548220054353870849>"}
+)
+
 func init() {
 	longDoc := "Examples:\n\n!get week\n\tShow the schedule for this week."
 	AddCommand("get", "Get information from the configured spreadsheet.", longDoc, Get)
@@ -84,7 +88,6 @@ func baseEmbed(title, sheetLink string) *discordgo.MessageEmbed {
 
 // addTimeField adds a field to the given embed with time emotes
 func addTimeField(e *discordgo.MessageEmbed, title string, startTime int) {
-	timeEmotes := []string{":zero:", ":one:", ":two:", ":three:", ":four:", ":five:", ":six:", ":seven:", ":eight:", ":nine:", ":keycap_ten:", "<:eleven:548022654540578827>", "<:twelve:548220054353870849>"}
 	var timeString string
 	for i := 0; i < 5; i++ {
 		timeString += timeEmotes[i+startTime] + ", "
@@ -142,26 +145,35 @@ func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
 	addTimeField(embed, "Players", 4)
 
-	for _, player := range p {
-		var roleEmoji string
-		switch player.Role {
+	roleEmoji := func(role string) string {
+		switch role {
 		case "Tanks":
-			roleEmoji = ":shield:"
+			return ":shield:"
 		case "DPS":
-			roleEmoji = ":crossed_swords:"
+			return ":crossed_swords:"
 		case "Supports":
-			roleEmoji = ":ambulance:"
+			return ":ambulance:"
 		case "Coaches":
-			roleEmoji = ":books:"
+			return ":books:"
 		case "Flex":
-			roleEmoji = ":muscle:"
+			return ":muscle:"
+		default:
+			return ""
+		}
+	}
+
+	roleAvailability := map[string]*[6]int{}
+	for _, player := range p {
+		if roleAvailability[player.Role] == nil {
+			roleAvailability[player.Role] = &[6]int{}
 		}
 
 		var emojis []string
-		for _, response := range player.AvailabilityOn(day) {
+		for i, response := range player.AvailabilityOn(day) {
 			var emoji string
 			switch response {
 			case "Yes":
+				roleAvailability[player.Role][i]++
 				emoji = ":white_check_mark:"
 			case "Maybe":
 				emoji = ":grey_question:"
@@ -172,7 +184,15 @@ func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day
 		}
 		emojiString := strings.Join(emojis, ", ")
 
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji + " " + player.Name, emojiString, false})
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji(player.Role) + " " + player.Name, emojiString, false})
+	}
+
+	for role, counts := range roleAvailability {
+		var availability []string
+		for _, count := range counts {
+			availability = append(availability, timeEmotes[count])
+		}
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji(role) + " " + role, strings.Join(availability, ", "), false})
 	}
 
 	return embed
