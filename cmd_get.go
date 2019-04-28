@@ -115,36 +115,35 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 		return embed
 	}
 
-	activityEmoji := func(activity string) string {
-		if activity == "" || activity == "TBD" {
-			return ":grey_question:"
-		}
-		emojiName := strings.Replace(strings.ToLower(activity), " ", "_", -1)
-		for _, emoji := range emojiGuild.Emojis {
-			if emoji.Name == emojiName {
-				return emoji.MessageFormat()
-			}
-		}
-		return fmt.Sprintf(":regional_indicator_%s:", strings.ToLower(string(activity[0])))
-	}
-	formatDay := func(day [6]string) string {
-		var activityEmojis []string
-		for i := 0; i < 6; i++ {
-			activityEmojis = append(activityEmojis, activityEmoji(day[i]))
-		}
-		return strings.Join(activityEmojis, ", ")
-	}
-
 	days := w.Values()
 	for i := 0; i < 7; i++ {
-		activityEmojis := formatDay(days[i])
+		var activityEmojis []string
+		for j := 0; j < 6; j++ {
+			activity := days[i][j]
+			if activity == "" || activity == "TBD" {
+				activityEmojis = append(activityEmojis, ":grey_question:")
+				continue
+			}
+			emojiName := strings.Replace(strings.ToLower(activity), " ", "_", -1)
+			var found bool
+			for _, emoji := range emojiGuild.Emojis {
+				if emoji.Name == emojiName {
+					activityEmojis = append(activityEmojis, emoji.MessageFormat())
+					found = true
+					break
+				}
+			}
+			if !found {
+				activityEmojis = append(activityEmojis, fmt.Sprintf(":regional_indicator_%s:", strings.ToLower(string(activity[0]))))
+			}
+		}
 		var dayName string
 		if i == Weekday() {
 			dayName = "**" + w.Days[i] + "**"
 		} else {
 			dayName = w.Days[i]
 		}
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: dayName, Value: activityEmojis, Inline: false})
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: dayName, Value: strings.Join(activityEmojis, ", "), Inline: false})
 	}
 
 	return embed
