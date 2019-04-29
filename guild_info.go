@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/bigheadgeorge/thonky2/db"
-	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 	"log"
 )
 
@@ -13,7 +12,7 @@ type BaseInfo interface {
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
-	Sheet   *spreadsheet.Spreadsheet
+	Sheet   *Sheet
 	Players []*Player
 	Week    *Week
 	*db.TeamConfig
@@ -44,28 +43,26 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 	}
 
 	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
-		var sheet spreadsheet.Spreadsheet
-		var err error
 		teamInfo := &TeamInfo{TeamConfig: config}
 		if config.DocKey.Valid {
-			sheet, err = Service.FetchSpreadsheet(config.DocKey.String)
 			log.Println("grabbing sheet for", config.GuildID)
+			sheet, err := Service.FetchSpreadsheet(config.DocKey.String)
 			if err != nil {
 				log.Println(err)
 				return teamInfo
 			}
-			teamInfo.Sheet = &sheet
+			teamInfo.Sheet = &Sheet{Spreadsheet: &sheet}
 		} else {
 			log.Printf("err: no dockey for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
 			return teamInfo
 		}
-		teamInfo.Players, err = GetPlayers(&sheet)
+		teamInfo.Players, err = teamInfo.Sheet.GetPlayers()
 		if err != nil {
 			log.Println(err)
 			return teamInfo
 		}
 		log.Println("grabbed players")
-		teamInfo.Week, err = GetWeek(&sheet)
+		teamInfo.Week, err = teamInfo.Sheet.GetWeek()
 		if err != nil {
 			log.Println(err)
 			return teamInfo

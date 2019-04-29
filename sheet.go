@@ -59,7 +59,7 @@ func (p *Player) AvailabilityAt(day, time, start int) string {
 	return p.AvailabilityOn(day)[time-start]
 }
 
-func getPlayer(s *spreadsheet.Spreadsheet, name string) (Player, error) {
+func (s *Sheet) getPlayer(name string) (Player, error) {
 	sheet, err := s.SheetByTitle(name)
 	if err != nil {
 		return Player{}, err
@@ -76,8 +76,13 @@ func getPlayer(s *spreadsheet.Spreadsheet, name string) (Player, error) {
 	return p, nil
 }
 
+// Sheet wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
+type Sheet struct {
+	*spreadsheet.Spreadsheet
+}
+
 // GetPlayers returns all of the players on a sheet.
-func GetPlayers(s *spreadsheet.Spreadsheet) ([]*Player, error) {
+func (s *Sheet) GetPlayers() ([]*Player, error) {
 	sheet, err := s.SheetByTitle("Team Availability")
 	if err != nil {
 		return []*Player{}, err
@@ -99,7 +104,7 @@ func GetPlayers(s *spreadsheet.Spreadsheet) ([]*Player, error) {
 			playerCount++
 			go func(name, role string) {
 				defer wg.Done()
-				player, _ := getPlayer(s, name)
+				player, _ := s.getPlayer(name)
 				player.Role = role
 				pCh <- player
 			}(name, currentRole)
@@ -120,7 +125,7 @@ func GetPlayers(s *spreadsheet.Spreadsheet) ([]*Player, error) {
 }
 
 // GetWeek returns the week schedule on a sheet.
-func GetWeek(s *spreadsheet.Spreadsheet) (*Week, error) {
+func (s *Sheet) GetWeek() (*Week, error) {
 	sheet, err := s.SheetByTitle("Weekly Schedule")
 	if err != nil {
 		return &Week{}, err
