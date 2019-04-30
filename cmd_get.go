@@ -29,9 +29,8 @@ func Weekday() int {
 	today := time.Now().Weekday()
 	if today == 0 {
 		return 6
-	} else {
-		return int(today) - 1
 	}
+	return int(today) - 1
 }
 
 // Get formats information from a given spreadsheet into a Discord embed.
