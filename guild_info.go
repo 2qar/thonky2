@@ -45,13 +45,13 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
 		teamInfo := &TeamInfo{TeamConfig: config}
 		if config.DocKey.Valid {
-			sheet, err := Service.FetchSpreadsheet(config.DocKey.String)
 			log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
+			sheet, err := GetSheet(config.DocKey.String)
 			if err != nil {
 				log.Println(err)
 				return teamInfo
 			}
-			teamInfo.Sheet = &Sheet{Spreadsheet: &sheet}
+			teamInfo.Sheet = sheet
 		} else {
 			log.Printf("err: no dockey for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
 			return teamInfo

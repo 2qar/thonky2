@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,8 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
@@ -26,6 +29,9 @@ var (
 
 	// guildInfo holds the config for each guild the bot is in
 	guildInfo = make(map[string]*GuildInfo)
+
+	// FilesService is the service used to grab spreadsheet metadata
+	FilesService *drive.FilesService
 )
 
 // GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
@@ -53,7 +59,8 @@ func main() {
 		panic(err)
 	}
 	config := struct {
-		Token string
+		Token        string
+		GoogleAPIKey string `json:"google_api_key"`
 	}{}
 	err = json.Unmarshal(b, &config)
 	if err != nil {
@@ -61,6 +68,8 @@ func main() {
 	}
 	if config.Token == "" {
 		panic(fmt.Errorf("no token in config.json"))
+	} else if config.GoogleAPIKey == "" {
+		panic("no google api key in config.json")
 	}
 	d, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
@@ -79,6 +88,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	ctx := context.Background()
+	service, err := drive.NewService(ctx, option.WithAPIKey(config.GoogleAPIKey))
+	if err != nil {
+		panic(err)
+	}
+	FilesService = drive.NewFilesService(service)
 
 	logFile := StartLog()
 	log.Println("running")

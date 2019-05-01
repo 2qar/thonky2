@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"sync"
+	"time"
 
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
@@ -76,9 +77,41 @@ func (s *Sheet) getPlayer(name string) (Player, error) {
 	return p, nil
 }
 
+// GetSheet returns a Sheet based on sheetID
+func GetSheet(sheetID string) (s *Sheet, err error) {
+	sheet, err := Service.FetchSpreadsheet(sheetID)
+	if err != nil {
+		return
+	}
+	s = &Sheet{Spreadsheet: &sheet}
+	lastModified, err := s.getLastModified()
+	if err != nil {
+		return
+	}
+	s.LastModified = lastModified
+	return
+}
+
 // Sheet wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
 type Sheet struct {
+	LastModified *time.Time
 	*spreadsheet.Spreadsheet
+}
+
+// getLastModified returns the sheet's last modified time according to Google Drive
+func (s *Sheet) getLastModified() (*time.Time, error) {
+	call := FilesService.Get(s.ID)
+	call = call.Fields("modifiedTime")
+	f, err := call.Do()
+	if err != nil {
+		return nil, err
+	}
+	timeString := f.ModifiedTime[:strings.LastIndex(f.ModifiedTime, ".")]
+	t, err := time.Parse("2006-01-02T15:04:05", timeString)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
 }
 
 // GetPlayers returns all of the players on a sheet.
