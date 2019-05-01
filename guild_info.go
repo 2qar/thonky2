@@ -45,8 +45,8 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
 		teamInfo := &TeamInfo{TeamConfig: config}
 		if config.DocKey.Valid {
-			log.Println("grabbing sheet for", config.GuildID)
 			sheet, err := Service.FetchSpreadsheet(config.DocKey.String)
+			log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
 			if err != nil {
 				log.Println(err)
 				return teamInfo
