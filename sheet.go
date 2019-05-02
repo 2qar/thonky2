@@ -84,7 +84,7 @@ func GetSheet(sheetID string) (s *Sheet, err error) {
 		return
 	}
 	s = &Sheet{Spreadsheet: &sheet}
-	lastModified, err := s.getLastModified()
+	lastModified, err := sheetLastModified(sheetID)
 	if err != nil {
 		return
 	}
@@ -190,8 +190,13 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	return week, err
 }
 
+// cacheFilename returns a filename based on attr and sheetID
+func cacheFilename(attr, sheetID string) string {
+	return "cache/" + sheetID + "_" + attr + ".json"
+}
+
 func saveSheetAttr(c interface{}, attr, sheetID string) error {
-	filename := sheetID + "_" + attr + ".json"
+	filename := cacheFilename(attr, sheetID)
 	m, err := json.Marshal(c)
 	if err != nil {
 		return err
@@ -204,6 +209,6 @@ func saveSheetAttr(c interface{}, attr, sheetID string) error {
 }
 
 func loadSheetAttr(attr, sheetID string) (b []byte, err error) {
-	b, err = ioutil.ReadFile(sheetID + "_" + attr + ".json")
+	b, err = ioutil.ReadFile(cacheFilename(attr, sheetID))
 	return
 }
