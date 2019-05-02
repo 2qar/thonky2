@@ -98,9 +98,9 @@ type Sheet struct {
 	*spreadsheet.Spreadsheet
 }
 
-// getLastModified returns the sheet's last modified time according to Google Drive
-func (s *Sheet) getLastModified() (*time.Time, error) {
-	call := FilesService.Get(s.ID)
+// sheetLastModified returns the sheet's last modified time according to Google Drive
+func sheetLastModified(sheetID string) (*time.Time, error) {
+	call := FilesService.Get(sheetID)
 	call = call.Fields("modifiedTime")
 	f, err := call.Do()
 	if err != nil {
@@ -112,6 +112,15 @@ func (s *Sheet) getLastModified() (*time.Time, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+// Updated returns whether the sheet is updated or not
+func (s *Sheet) Updated() (bool, error) {
+	lastModified, err := sheetLastModified(s.ID)
+	if err != nil {
+		return false, err
+	}
+	return lastModified.Before(*s.LastModified) || lastModified.Equal(*s.LastModified), nil
 }
 
 // GetPlayers returns all of the players on a sheet.
