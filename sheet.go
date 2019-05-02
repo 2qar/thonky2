@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -84,17 +86,61 @@ func GetSheet(sheetID string) (s *Sheet, err error) {
 		return
 	}
 	s = &Sheet{Spreadsheet: &sheet}
-	lastModified, err := sheetLastModified(sheetID)
-	if err != nil {
+	if _, ferr := os.Open(cacheFilename("modified", sheetID)); ferr == nil {
+		log.Println("loading sheet")
+		var b []byte
+		b, err = loadSheetAttr("modified", sheetID)
+		if err != nil {
+			return
+		}
+		var t time.Time
+		err = json.Unmarshal(b, &t)
+		s.LastModified = &t
+		var updated bool
+		updated, err = s.Updated()
+		if err != nil {
+			log.Println("error grabbing s.Updated():", err)
+			return
+		} else if !updated {
+			log.Printf("cache for [%s] outdated\n", sheetID)
+			return
+		}
+
+		b, err = loadSheetAttr("players", sheetID)
+		if err != nil {
+			return
+		}
+		var players []*Player
+		err = json.Unmarshal(b, &players)
+		if err != nil {
+			return
+		}
+		s.PlayerCache = players
+
+		b, err = loadSheetAttr("week", sheetID)
+		if err != nil {
+			return
+		}
+		var week *Week
+		err = json.Unmarshal(b, &week)
+		if err != nil {
+			return
+		}
+		s.WeekCache = week
+
+		log.Println("loaded sheet")
 		return
 	}
-	s.LastModified = lastModified
+	err = s.UpdateModified()
+	log.Println("got sheet")
 	return
 }
 
 // Sheet wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
 type Sheet struct {
 	LastModified *time.Time
+	PlayerCache  []*Player
+	WeekCache    *Week
 	*spreadsheet.Spreadsheet
 }
 
@@ -123,8 +169,25 @@ func (s *Sheet) Updated() (bool, error) {
 	return lastModified.Before(*s.LastModified) || lastModified.Equal(*s.LastModified), nil
 }
 
+// UpdateModified syncs the sheet's modified time with Google Drive's time
+func (s *Sheet) UpdateModified() error {
+	lastModified, err := sheetLastModified(s.ID)
+	if err != nil {
+		return err
+	}
+	s.LastModified = lastModified
+	return nil
+}
+
 // GetPlayers returns all of the players on a sheet.
 func (s *Sheet) GetPlayers() ([]*Player, error) {
+	updated, err := s.Updated()
+	if err != nil {
+		return []*Player{}, nil
+	} else if updated && s.PlayerCache != nil {
+		return s.PlayerCache, nil
+	}
+
 	sheet, err := s.SheetByTitle("Team Availability")
 	if err != nil {
 		return []*Player{}, err
@@ -163,11 +226,19 @@ func (s *Sheet) GetPlayers() ([]*Player, error) {
 		p := <-pCh
 		players = append(players, &p)
 	}
+	s.PlayerCache = players
 	return players, nil
 }
 
 // GetWeek returns the week schedule on a sheet.
 func (s *Sheet) GetWeek() (*Week, error) {
+	updated, err := s.Updated()
+	if err != nil {
+		return nil, nil
+	} else if updated && s.WeekCache != nil {
+		return s.WeekCache, nil
+	}
+
 	sheet, err := s.SheetByTitle("Weekly Schedule")
 	if err != nil {
 		return &Week{}, err
@@ -187,7 +258,34 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	week.Days = &days
 	week.Cells = &cells
 
+	s.WeekCache = week
 	return week, err
+}
+
+// Save writes the sheet info to disk.
+func (s *Sheet) Save() (err error) {
+	if _, err = os.Open("cache"); os.IsNotExist(err) {
+		err = os.Mkdir("cache", 0700)
+		if err != nil {
+			return
+		}
+	}
+
+	err = saveSheetAttr(s.LastModified, "modified", s.ID)
+	if err != nil {
+		return
+	}
+
+	err = saveSheetAttr(s.PlayerCache, "players", s.ID)
+	if err != nil {
+		return
+	}
+	err = saveSheetAttr(s.WeekCache, "week", s.ID)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 // cacheFilename returns a filename based on attr and sheetID
@@ -196,6 +294,7 @@ func cacheFilename(attr, sheetID string) string {
 }
 
 func saveSheetAttr(c interface{}, attr, sheetID string) error {
+	log.Printf("saving %s for [%s]\n", attr, sheetID)
 	filename := cacheFilename(attr, sheetID)
 	m, err := json.Marshal(c)
 	if err != nil {
@@ -209,6 +308,7 @@ func saveSheetAttr(c interface{}, attr, sheetID string) error {
 }
 
 func loadSheetAttr(attr, sheetID string) (b []byte, err error) {
+	log.Printf("loading %s for [%s]\n", attr, sheetID)
 	b, err = ioutil.ReadFile(cacheFilename(attr, sheetID))
 	return
 }

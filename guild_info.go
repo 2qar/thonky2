@@ -68,6 +68,14 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 			return teamInfo
 		}
 		log.Println("grabbed week")
+		err = teamInfo.Sheet.UpdateModified()
+		if err != nil {
+			log.Println(err)
+		}
+		err = teamInfo.Sheet.Save()
+		if err != nil {
+			log.Println(err)
+		}
 		return teamInfo
 	}
 	g = &GuildInfo{TeamInfo: getTeamInfo(config)}
