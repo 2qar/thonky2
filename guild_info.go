@@ -12,9 +12,10 @@ type BaseInfo interface {
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
-	Sheet   *Sheet
-	Players []*Player
-	Week    *Week
+	Sheet    *Sheet
+	Players  []*Player
+	Week     *Week
+	Updating bool
 	*db.TeamConfig
 }
 
@@ -43,6 +44,16 @@ func (t *TeamInfo) cacheSheetInfo(save bool) (err error) {
 		log.Printf("caching info for [%s]\n", t.Sheet.ID)
 		err = t.Sheet.Save()
 	}
+	return err
+}
+
+// Update reloads the sheet, and parses the new Players and Week
+func (t *TeamInfo) Update() error {
+	err := Service.ReloadSpreadsheet(t.Sheet.Spreadsheet)
+	if err != nil {
+		return err
+	}
+	err = t.cacheSheetInfo(true)
 	return err
 }
 
