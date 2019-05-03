@@ -34,10 +34,8 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 	msg, _ := s.ChannelMessageSend(m.ChannelID, "Updating...")
-	info.Updating = true
-	defer func() { info.Updating = false }()
 
-	err = info.Update()
+	err = info.Update(true)
 	if err != nil {
 		log.Println(err)
 		s.ChannelMessageEdit(m.ChannelID, msg.ID, "Error updating. :(")

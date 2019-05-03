@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/bigheadgeorge/thonky2/db"
 	"log"
+	"time"
 )
 
 // BaseInfo acts as the crappy interface for TeamInfo and GuildInfo, but it works :)
@@ -48,12 +49,14 @@ func (t *TeamInfo) cacheSheetInfo(save bool) (err error) {
 }
 
 // Update reloads the sheet, and parses the new Players and Week
-func (t *TeamInfo) Update() error {
+func (t *TeamInfo) Update(save bool) error {
+	t.Updating = true
 	err := Service.ReloadSpreadsheet(t.Sheet.Spreadsheet)
 	if err != nil {
 		return err
 	}
-	err = t.cacheSheetInfo(true)
+	err = t.cacheSheetInfo(save)
+	t.Updating = false
 	return err
 }
 
@@ -97,6 +100,21 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 		if err != nil {
 			log.Println(err)
 		}
+		go func(t *TeamInfo) {
+			for {
+				time.Sleep(time.Duration(t.UpdateInterval) * time.Minute)
+				log.Printf("bg updating [%s]\n", t.Sheet.ID)
+				updated, err := t.Sheet.Updated()
+				if err != nil {
+					log.Println(err)
+				} else {
+					err = t.Update(!updated)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
+		}(teamInfo)
 		return teamInfo
 	}
 	g = &GuildInfo{TeamInfo: getTeamInfo(config)}
