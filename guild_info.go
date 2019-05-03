@@ -23,6 +23,29 @@ func (t *TeamInfo) SheetLink() string {
 	return "https://docs.google.com/spreadsheets/d/" + t.DocKey.String
 }
 
+// cacheSheetInfo grabs the Players and Week from it's sheet
+func (t *TeamInfo) cacheSheetInfo(save bool) (err error) {
+	t.Players, err = t.Sheet.GetPlayers()
+	if err != nil {
+		return
+	}
+	log.Println("grabbed players")
+	t.Week, err = t.Sheet.GetWeek()
+	if err != nil {
+		return
+	}
+	log.Println("grabbed week")
+	err = t.Sheet.UpdateModified()
+	if err != nil {
+		return
+	}
+	if save {
+		log.Printf("caching info for [%s]\n", t.Sheet.ID)
+		err = t.Sheet.Save()
+	}
+	return err
+}
+
 // GuildInfo stores the default TeamInfo for the guild, plus info on every team in the guild
 type GuildInfo struct {
 	Teams []*TeamInfo
@@ -43,36 +66,23 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 	}
 
 	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
+		var updated bool
 		teamInfo := &TeamInfo{TeamConfig: config}
 		if config.DocKey.Valid {
 			log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
-			sheet, err := GetSheet(config.DocKey.String)
+			var sheet Sheet
+			var err error
+			updated, err = GetSheet(config.DocKey.String, &sheet)
 			if err != nil {
 				log.Println(err)
 				return teamInfo
 			}
-			teamInfo.Sheet = sheet
+			teamInfo.Sheet = &sheet
 		} else {
 			log.Printf("err: no dockey for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
 			return teamInfo
 		}
-		teamInfo.Players, err = teamInfo.Sheet.GetPlayers()
-		if err != nil {
-			log.Println(err)
-			return teamInfo
-		}
-		log.Println("grabbed players")
-		teamInfo.Week, err = teamInfo.Sheet.GetWeek()
-		if err != nil {
-			log.Println(err)
-			return teamInfo
-		}
-		log.Println("grabbed week")
-		err = teamInfo.Sheet.UpdateModified()
-		if err != nil {
-			log.Println(err)
-		}
-		err = teamInfo.Sheet.Save()
+		err := teamInfo.cacheSheetInfo(!updated)
 		if err != nil {
 			log.Println(err)
 		}

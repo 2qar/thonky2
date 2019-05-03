@@ -80,12 +80,12 @@ func (s *Sheet) getPlayer(name string) (Player, error) {
 }
 
 // GetSheet returns a Sheet based on sheetID
-func GetSheet(sheetID string) (s *Sheet, err error) {
+func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 	sheet, err := Service.FetchSpreadsheet(sheetID)
 	if err != nil {
 		return
 	}
-	s = &Sheet{Spreadsheet: &sheet}
+	*s = Sheet{Spreadsheet: &sheet}
 	if _, ferr := os.Open(cacheFilename("modified", sheetID)); ferr == nil {
 		log.Println("loading sheet")
 		var b []byte
@@ -96,7 +96,6 @@ func GetSheet(sheetID string) (s *Sheet, err error) {
 		var t time.Time
 		err = json.Unmarshal(b, &t)
 		s.LastModified = &t
-		var updated bool
 		updated, err = s.Updated()
 		if err != nil {
 			log.Println("error grabbing s.Updated():", err)
