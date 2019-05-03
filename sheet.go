@@ -268,6 +268,11 @@ func (s *Sheet) Save() (err error) {
 		if err != nil {
 			return
 		}
+	} else if _, err = os.Open("cache/" + s.ID); os.IsNotExist(err) {
+		err = os.Mkdir("cache/"+s.ID, 0700)
+		if err != nil {
+			return
+		}
 	}
 
 	err = saveSheetAttr(s.LastModified, "modified", s.ID)
@@ -289,7 +294,7 @@ func (s *Sheet) Save() (err error) {
 
 // cacheFilename returns a filename based on attr and sheetID
 func cacheFilename(attr, sheetID string) string {
-	return "cache/" + sheetID + "_" + attr + ".json"
+	return "cache/" + sheetID + "/" + attr + ".json"
 }
 
 func saveSheetAttr(c interface{}, attr, sheetID string) error {
