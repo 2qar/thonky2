@@ -14,7 +14,7 @@ type cmd func(*discord.Session, *discord.MessageCreate, []string)
 type Command struct {
 	Name     string
 	ShortDoc string
-	LongDoc  string
+	Examples [][2]string
 	Call     cmd
 }
 
@@ -26,8 +26,8 @@ func (c *Command) AddAliases(aliases []string) {
 }
 
 // AddCommand adds a command to the list
-func AddCommand(name, shortDoc, longDoc string, c cmd) *Command {
-	command := &Command{name, shortDoc, longDoc, c}
+func AddCommand(name, shortDoc string, examples [][2]string, c cmd) *Command {
+	command := &Command{name, shortDoc, examples, c}
 	Commands[name] = command
 	return command
 }

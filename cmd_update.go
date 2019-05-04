@@ -6,8 +6,7 @@ import (
 )
 
 func init() {
-	longdoc := "Examples:\n\n!update\n\tUpdate the sheet. :)"
-	AddCommand("update", "Update the sheet", longdoc, Update)
+	AddCommand("update", "Update the sheet", [][2]string{{"!update", "Update the sheet. :)"}}, Update)
 }
 
 // Update updates the sheet locally

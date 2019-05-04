@@ -17,8 +17,11 @@ const (
 )
 
 func init() {
-	longDoc := "Examples:\n\n!od 1\n\tGet info on the other team in round 1.\n!od cloud9\n\tGet info on cloud9, if they're in our tournament."
-	AddCommand("od", "Get information about another team or a round of Open Division", longDoc, OD)
+	examples := [][2]string{
+		{"!od 1", "Get info on the other team in round 1."},
+		{"!od cloud9", "Get info on cloud9, if they're in our tournament."},
+	}
+	AddCommand("od", "Get information about another team or a round of Open Division", examples, OD)
 }
 
 // OD grabs information about another team

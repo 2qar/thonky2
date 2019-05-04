@@ -5,7 +5,7 @@ import (
 )
 
 func init() {
-	AddCommand("help", "duh", "Examples:\n\n!help\n\tyup", help)
+	AddCommand("help", "duh", [][2]string{{"!help", "yeah"}}, help)
 }
 
 func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
@@ -14,7 +14,11 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	} else if len(args) == 2 {
 		cmd := Commands[args[1]]
 		if cmd.Name != "" {
-			cmdHelp := "```\n" + "!" + cmd.Name + ": " + cmd.ShortDoc + "\n\n" + cmd.LongDoc + "\n```"
+			longDoc := "Examples:\n\n"
+			for _, example := range cmd.Examples {
+				longDoc += example[0] + "\n\t" + example[1] + "\n"
+			}
+			cmdHelp := "```\n" + "!" + cmd.Name + ": " + cmd.ShortDoc + "\n\n" + longDoc + "```"
 			s.ChannelMessageSend(m.ChannelID, cmdHelp)
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "No command named \""+args[1]+"\"")

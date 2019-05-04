@@ -14,8 +14,10 @@ var (
 )
 
 func init() {
-	longDoc := "Examples:\n\n!get week\n\tShow the schedule for this week."
-	AddCommand("get", "Get information from the configured spreadsheet.", longDoc, Get)
+	examples := [][2]string{
+		{"!get week", "Show the schedule for this week."},
+	}
+	AddCommand("get", "Get information from the configured spreadsheet.", examples, Get)
 }
 
 func logEmbed(e *discordgo.MessageEmbed) {
