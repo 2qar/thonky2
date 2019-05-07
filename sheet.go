@@ -263,12 +263,14 @@ func (s *Sheet) GetWeek() (*Week, error) {
 
 // Save writes the sheet info to disk.
 func (s *Sheet) Save() (err error) {
-	if _, err = os.Open("cache"); os.IsNotExist(err) {
-		err = os.Mkdir("cache", 0700)
-		if err != nil {
-			return
+	if _, err = os.Open("cache/" + s.ID); os.IsNotExist(err) {
+		if _, err = os.Open("cache"); os.IsNotExist(err) {
+			err = os.Mkdir("cache", 0700)
+			if err != nil {
+				return
+			}
 		}
-	} else if _, err = os.Open("cache/" + s.ID); os.IsNotExist(err) {
+
 		err = os.Mkdir("cache/"+s.ID, 0700)
 		if err != nil {
 			return
