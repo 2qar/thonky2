@@ -22,9 +22,6 @@ var (
 	// Token is the token for the bot
 	Token string
 
-	// SheetID is the ID of the sheet to grab info from
-	SheetID = "19LIrH878DY9Ltaux3KlfIenmMFfPTA16NWnnQQMHG0Y"
-
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
 
