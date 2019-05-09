@@ -127,19 +127,40 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 		}
 		s.WeekCache = week
 
+		b, err = loadSheetAttr("activities", sheetID)
+		if err != nil {
+			return
+		}
+		var activities []string
+		err = json.Unmarshal(b, &activities)
+		if err != nil {
+			return
+		}
+		s.ValidActivities = activities
+
 		log.Println("loaded sheet")
 		return
 	}
 	err = s.UpdateModified()
+	if err != nil {
+		return
+	}
+	var activities []string
+	activities, err = sheetValidActivities(sheetID)
+	if err != nil {
+		return
+	}
+	s.ValidActivities = activities
 	log.Println("got sheet")
 	return
 }
 
 // Sheet wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
 type Sheet struct {
-	LastModified *time.Time
-	PlayerCache  []*Player
-	WeekCache    *Week
+	LastModified    *time.Time
+	PlayerCache     []*Player
+	WeekCache       *Week
+	ValidActivities []string
 	*spreadsheet.Spreadsheet
 }
 
@@ -157,6 +178,26 @@ func sheetLastModified(sheetID string) (*time.Time, error) {
 		return nil, err
 	}
 	return &t, nil
+}
+
+func sheetValidActivities(sheetID string) ([]string, error) {
+	call := SpreadsheetsService.Get(sheetID)
+	call.Fields("sheets")
+	file, err := call.Do()
+	if err != nil {
+		return []string{}, err
+	}
+	var activities []string
+	for _, sheet := range file.Sheets {
+		if sheet.Properties.Title == "Weekly Schedule" {
+			for _, rule := range sheet.ConditionalFormats {
+				for _, value := range rule.BooleanRule.Condition.Values {
+					activities = append(activities, value.UserEnteredValue)
+				}
+			}
+		}
+	}
+	return activities, nil
 }
 
 // Updated returns whether the sheet is updated or not
@@ -287,6 +328,10 @@ func (s *Sheet) Save() (err error) {
 		return
 	}
 	err = saveSheetAttr(s.WeekCache, "week", s.ID)
+	if err != nil {
+		return
+	}
+	err = saveSheetAttr(s.ValidActivities, "activities", s.ID)
 	if err != nil {
 		return
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
@@ -32,6 +33,9 @@ var (
 
 	// FilesService is the service used to grab spreadsheet metadata
 	FilesService *drive.FilesService
+
+	// SpreadsheetsService is the service for grabbing Spreadsheet info not exposed by gopkg.in/Iwark/spreadsheet.v2
+	SpreadsheetsService *sheets.SpreadsheetsService
 )
 
 // GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
@@ -90,11 +94,18 @@ func main() {
 	}
 
 	ctx := context.Background()
-	service, err := drive.NewService(ctx, option.WithAPIKey(config.GoogleAPIKey))
+	opt := option.WithAPIKey(config.GoogleAPIKey)
+	service, err := drive.NewService(ctx, opt)
 	if err != nil {
 		panic(err)
 	}
 	FilesService = drive.NewFilesService(service)
+
+	sheetService, err := sheets.NewService(ctx, opt)
+	if err != nil {
+		panic(err)
+	}
+	SpreadsheetsService = sheets.NewSpreadsheetsService(sheetService)
 
 	logFile := StartLog()
 	log.Println("running")

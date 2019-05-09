@@ -88,7 +88,7 @@ func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
 			var err error
 			updated, err = GetSheet(config.DocKey.String, &sheet)
 			if err != nil {
-				log.Println(err)
+				log.Println("error grabbing sheet for", config.GuildID, err)
 				return teamInfo
 			}
 			teamInfo.Sheet = &sheet
