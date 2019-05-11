@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -38,15 +39,17 @@ var (
 // GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
 func GetInfo(guildID, channelID string) (*TeamInfo, error) {
 	info := guildInfo[guildID]
-	if info != (&GuildInfo{}) {
+	if info != nil {
 		for _, team := range info.Teams {
 			for _, id := range team.Channels {
-				if string(id) == channelID {
+				if strconv.FormatInt(id, 10) == channelID {
+					log.Printf("grabbed info for team %q in [%s]\n", team.TeamName, team.GuildID)
 					return team, nil
 				}
 			}
-			return info.TeamInfo, nil
 		}
+		log.Printf("grabbed info for guild [%s]\n", info.GuildID)
+		return info.TeamInfo, nil
 	}
 	return &TeamInfo{}, fmt.Errorf("no info for guild [%s]", guildID)
 }
