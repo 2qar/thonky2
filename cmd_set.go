@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -25,4 +27,31 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
+
+// parseArgs takes a list of unformatted arguments and tries to match them with a given list of valid arguments.
+func parseArgs(args []string, validArgs []string) ([]string, error) {
+	var argString string
+	if len(args) > 1 {
+		argString = strings.Join(args, " ")
+	} else {
+		argString = args[0]
+	}
+	csv := strings.Split(argString, ", ")
+
+	var parsed []string
+	for _, activity := range csv {
+		found := false
+		for _, valid := range validArgs {
+			if strings.ToLower(activity) == strings.ToLower(valid) {
+				found = true
+				parsed = append(parsed, valid)
+				break
+			}
+		}
+		if !found {
+			return []string{}, fmt.Errorf("Invalid activity: %q", activity)
+		}
+	}
+
+	return parsed, nil
 }
