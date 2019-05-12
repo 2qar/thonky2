@@ -3,10 +3,13 @@ package main
 import (
 	"fmt"
 	"log"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
 func init() {
@@ -35,12 +38,18 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		if day != -1 {
 			// update w/ day
 			log.Printf("update day %q w/ index %d\n", args[1], day)
-			args, err := parseArgs(args[2:], info.Sheet.ValidActivities)
+			sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
 			if err != nil {
 				log.Println(err)
 				return
 			}
-			log.Println(args)
+			err = tryUpdate(sheet, info.Week.Cells[day], 2, args, info.Sheet.ValidActivities)
+			if err != nil {
+				log.Println(err)
+				s.ChannelMessageSend(m.ChannelID, err.Error())
+			}
+
+			s.ChannelMessageSend(m.ChannelID, "Updated week schedule.")
 			return
 		}
 
@@ -57,12 +66,19 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			if day != -1 {
 				// update w/ player
 				log.Printf("update player %q\n", player.Name)
-				args, err := parseArgs(args[3:], []string{"Yes", "Maybe", "No"})
+				sheet, err := info.Sheet.SheetByTitle(player.Name)
 				if err != nil {
 					log.Println(err)
+					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing %s's sheet.", player.Name))
 					return
 				}
-				log.Println(args)
+				err = tryUpdate(sheet, player.Cells[day], 3, args, []string{"Yes", "Maybe", "No"})
+				if err != nil {
+					log.Println(err)
+					s.ChannelMessageSend(m.ChannelID, err.Error())
+				}
+
+				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Updated %s's schedule.", player.Name))
 				return
 			}
 
@@ -75,6 +91,88 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 
 	s.ChannelMessageSend(m.ChannelID, "weird amount of args")
+}
+
+func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string) error {
+	for i, cell := range cells {
+		sheet.Update(int(cell.Row), int(cell.Column), newValues[i])
+		cell.Value = newValues[i]
+	}
+	err := sheet.Synchronize()
+	return err
+}
+
+func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart int, args, validArgs []string) error {
+	if match, _ := regexp.MatchString(`\d{1,2}-\d{1,2}`, args[valueStart]); match {
+		rangeStart, rangeEnd, err := getTimeRange(args[valueStart])
+		if err != nil {
+			return err
+		}
+		var updateCells []*spreadsheet.Cell
+		if rangeStart == rangeEnd {
+			updateCells = []*spreadsheet.Cell{cells[rangeStart]}
+		} else {
+			updateCells = cells[rangeStart:rangeEnd]
+		}
+
+		parsed, err := parseArgs(args[valueStart+1:], validArgs)
+		if err != nil {
+			return err
+		} else if len(updateCells) != len(parsed) {
+			return fmt.Errorf("Invalid amount of activities for this range: %d cells =/= %d responses", len(updateCells), len(parsed))
+		}
+
+		return update(sheet, updateCells, parsed)
+	} else if i, err := strconv.Atoi(args[valueStart]); err == nil {
+		if i < 4 {
+			return fmt.Errorf("Invalid time: %d < 4", i)
+		}
+		parsed, err := parseArgs(args[valueStart+1:], validArgs)
+		if err != nil {
+			return err
+		} else if len(parsed) != 1 {
+			return fmt.Errorf("Too many arguments: %d != 1", len(parsed))
+		}
+
+		return update(sheet, []*spreadsheet.Cell{cells[i-4]}, parsed)
+	} else {
+		parsed, err := parseArgs(args[valueStart:], validArgs)
+		if err != nil {
+			return err
+		} else if len(parsed) != 1 {
+			return fmt.Errorf("Too many arguments: %d =/= 1", len(parsed))
+		}
+		var newValues []string
+		for i := 0; i < 6; i++ {
+			newValues = append(newValues, parsed[0])
+		}
+
+		var updateCells []*spreadsheet.Cell
+		for _, cell := range cells {
+			updateCells = append(updateCells, cell)
+		}
+		return update(sheet, updateCells, newValues)
+	}
+}
+
+func getTimeRange(timeStr string) (int, int, error) {
+	timeStrings := strings.Split(timeStr, "-")
+	var timeRange [2]int
+	for i, timeStr := range timeStrings {
+		time, err := strconv.Atoi(timeStr)
+		if err != nil {
+			return -1, -1, err
+		}
+		timeRange[i] = time
+	}
+	if timeRange[0] < 4 {
+		return -1, -1, fmt.Errorf("Invalid start time")
+	} else if timeRange[0] > timeRange[1] {
+		return -1, -1, fmt.Errorf("Invalid time range: first time > second time")
+	}
+	rangeStart := timeRange[0] - 4
+	rangeEnd := rangeStart + (timeRange[1] - timeRange[0])
+	return rangeStart, rangeEnd, nil
 }
 
 // dayInt gets a weekday int from a day name.
