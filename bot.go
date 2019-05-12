@@ -20,9 +20,6 @@ import (
 )
 
 var (
-	// Token is the token for the bot
-	Token string
-
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
 
