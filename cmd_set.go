@@ -94,9 +94,16 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 }
 
 func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string) error {
-	for i, cell := range cells {
-		sheet.Update(int(cell.Row), int(cell.Column), newValues[i])
-		cell.Value = newValues[i]
+	if len(newValues) > 1 {
+		for i, cell := range cells {
+			sheet.Update(int(cell.Row), int(cell.Column), newValues[i])
+			cell.Value = newValues[i]
+		}
+	} else {
+		for _, cell := range cells {
+			sheet.Update(int(cell.Row), int(cell.Column), newValues[0])
+			cell.Value = newValues[0]
+		}
 	}
 	err := sheet.Synchronize()
 	return err
@@ -118,7 +125,7 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 		parsed, err := parseArgs(args[valueStart+1:], validArgs)
 		if err != nil {
 			return err
-		} else if len(updateCells) != len(parsed) {
+		} else if len(updateCells) != len(parsed) && len(parsed) != 1 {
 			return fmt.Errorf("Invalid amount of activities for this range: %d cells =/= %d responses", len(updateCells), len(parsed))
 		}
 
@@ -142,16 +149,12 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 		} else if len(parsed) != 1 {
 			return fmt.Errorf("Too many arguments: %d =/= 1", len(parsed))
 		}
-		var newValues []string
-		for i := 0; i < 6; i++ {
-			newValues = append(newValues, parsed[0])
-		}
 
 		var updateCells []*spreadsheet.Cell
 		for _, cell := range cells {
 			updateCells = append(updateCells, cell)
 		}
-		return update(sheet, updateCells, newValues)
+		return update(sheet, updateCells, parsed)
 	}
 }
 
