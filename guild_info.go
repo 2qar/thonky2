@@ -6,10 +6,6 @@ import (
 	"time"
 )
 
-// BaseInfo acts as the crappy interface for TeamInfo and GuildInfo, but it works :)
-type BaseInfo interface {
-	SheetLink() string
-}
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
