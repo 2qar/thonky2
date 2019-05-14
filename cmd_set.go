@@ -94,15 +94,19 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 }
 
 func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string) error {
-	if len(newValues) > 1 {
-		for i, cell := range cells {
+	safeUpdate := func(cell *spreadsheet.Cell, i int) {
+		if cell.Value != newValues[i] {
 			sheet.Update(int(cell.Row), int(cell.Column), newValues[i])
 			cell.Value = newValues[i]
 		}
+	}
+	if len(newValues) > 1 {
+		for i, cell := range cells {
+			safeUpdate(cell, i)
+		}
 	} else {
 		for _, cell := range cells {
-			sheet.Update(int(cell.Row), int(cell.Column), newValues[0])
-			cell.Value = newValues[0]
+			safeUpdate(cell, 0)
 		}
 	}
 	err := sheet.Synchronize()
