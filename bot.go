@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -23,33 +22,12 @@ var (
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
 
-	// guildInfo holds the config for each guild the bot is in
-	guildInfo = make(map[string]*GuildInfo)
-
 	// FilesService is the service used to grab spreadsheet metadata
 	FilesService *drive.FilesService
 
 	// SpreadsheetsService is the service for grabbing Spreadsheet info not exposed by gopkg.in/Iwark/spreadsheet.v2
 	SpreadsheetsService *sheets.SpreadsheetsService
 )
-
-// GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
-func GetInfo(guildID, channelID string) (*TeamInfo, error) {
-	info := guildInfo[guildID]
-	if info != nil {
-		for _, team := range info.Teams {
-			for _, id := range team.Channels {
-				if strconv.FormatInt(id, 10) == channelID {
-					log.Printf("grabbed info for team %q in [%s]\n", team.TeamName, team.GuildID)
-					return team, nil
-				}
-			}
-		}
-		log.Printf("grabbed info for guild [%s]\n", info.GuildID)
-		return info.TeamInfo, nil
-	}
-	return &TeamInfo{}, fmt.Errorf("no info for guild [%s]", guildID)
-}
 
 func main() {
 	if _, err := os.Open("config.json"); os.IsNotExist(err) {
@@ -116,7 +94,7 @@ func main() {
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
 	for _, guild := range r.Guilds {
-		info, err := GetGuildInfo(guild.ID)
+		info, err := NewGuildInfo(guild.ID)
 		if err != nil {
 			log.Println(err)
 			continue

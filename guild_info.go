@@ -1,11 +1,15 @@
 package main
 
 import (
-	"github.com/bigheadgeorge/thonky2/db"
+	"fmt"
 	"log"
+	"strconv"
 	"time"
+
+	"github.com/bigheadgeorge/thonky2/db"
 )
 
+var guildInfo = map[string]*GuildInfo{}
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
@@ -62,8 +66,26 @@ type GuildInfo struct {
 	*TeamInfo
 }
 
-// GetGuildInfo returns info about a guild, including info about each of the teams in that guild.
-func GetGuildInfo(guildID string) (g *GuildInfo, err error) {
+// GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
+func GetInfo(guildID, channelID string) (*TeamInfo, error) {
+	info := guildInfo[guildID]
+	if info != nil {
+		for _, team := range info.Teams {
+			for _, id := range team.Channels {
+				if strconv.FormatInt(id, 10) == channelID {
+					log.Printf("grabbed info for team %q in [%s]\n", team.TeamName, team.GuildID)
+					return team, nil
+				}
+			}
+		}
+		log.Printf("grabbed info for guild [%s]\n", info.GuildID)
+		return info.TeamInfo, nil
+	}
+	return &TeamInfo{}, fmt.Errorf("no info for guild [%s]", guildID)
+}
+
+// NewGuildInfo returns info about a guild, including info about each of the teams in that guild.
+func NewGuildInfo(guildID string) (g *GuildInfo, err error) {
 	handler, err := db.NewHandler()
 	if err != nil {
 		return
