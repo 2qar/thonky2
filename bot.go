@@ -83,6 +83,12 @@ func main() {
 	SpreadsheetsService = sheets.NewSpreadsheetsService(sheetService)
 
 	logFile := StartLog()
+
+	err = StartReminders(d)
+	if err != nil {
+		log.Println(err)
+	}
+
 	log.Println("running")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
