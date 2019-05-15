@@ -184,7 +184,7 @@ func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day
 		}
 		emojiString := strings.Join(emojis, ", ")
 
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji(player.Role) + " " + player.Name, emojiString, false})
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: roleEmoji(player.Role) + " " + player.Name, Value: emojiString, Inline: false})
 	}
 
 	for role, counts := range roleAvailability {
@@ -192,7 +192,7 @@ func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day
 		for _, count := range counts {
 			availability = append(availability, timeEmotes[count])
 		}
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{roleEmoji(role) + " " + role, strings.Join(availability, ", "), false})
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: roleEmoji(role) + " " + role, Value: strings.Join(availability, ", "), Inline: false})
 	}
 
 	return embed
