@@ -15,7 +15,8 @@ var scheduler *cron.Cron
 
 // reminderCheck will check if there's an activity coming up that needs pinging
 type reminderCheck struct {
-	session *discordgo.Session
+	Time    int
+	Session *discordgo.Session
 }
 
 func (r reminderCheck) Run() {
@@ -32,20 +33,16 @@ func (r reminderCheck) Run() {
 				for _, reminder := range info.RemindActivities {
 					if activity == reminder {
 						done = true
-						if i < today.Hour()-3 {
+						if i < today.Hour()-15 {
 							break
 						}
 
-						later := today
-						later.Add(time.Duration(time.Hour))
-						timeUntil := int(later.Sub(today).Minutes())
-
-						announcement := fmt.Sprintf("%s in %d minutes", activity, timeUntil)
+						announcement := fmt.Sprintf("%s in %d minutes", activity, 60-r.Time)
 						if info.RoleMention.Valid {
 							announcement = info.RoleMention.String + " " + announcement
 						}
 
-						r.session.ChannelMessageSend(info.AnnounceChannel.String, announcement)
+						r.Session.ChannelMessageSend(info.AnnounceChannel.String, announcement)
 
 						announceLog := fmt.Sprintf("send announcement for %q in [%s]", activity, info.GuildID)
 						if info.TeamName != "" {
@@ -60,14 +57,18 @@ func (r reminderCheck) Run() {
 	}
 }
 
+func addReminder(time int, s *discordgo.Session) error {
+	return scheduler.AddJob(fmt.Sprintf("0 %d 15-20 * * *"), reminderCheck{Time: time, Session: s})
+}
+
 // StartReminders starts checking for reminders 45 and 15 minutes before each hour
 func StartReminders(s *discordgo.Session) error {
 	scheduler = cron.New()
-	err := scheduler.AddJob("0 15 3-8 * * *", reminderCheck{s})
+	err := addReminder(15, s)
 	if err != nil {
 		return err
 	}
-	err = scheduler.AddJob("0 45 3-8 * * *", reminderCheck{s})
+	err = addReminder(45, s)
 	if err != nil {
 		return err
 	}
