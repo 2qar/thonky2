@@ -10,10 +10,7 @@ import (
 )
 
 const (
-	tournamentID   = "5c7ccfe88d004d0345bbd0cd"
-	teamID         = "5bfe1b9418ddd9114f14efb0"
-	tournamentLink = "https://battlefy.com/overwatch-open-division-north-america/2019-overwatch-open-division-season-2-north-america/5c7ccfe88d004d0345bbd0cd/stage/5c929d720bc67d0345180aa6"
-	battlefyLogo   = "http://s3.amazonaws.com/battlefy-assets/helix/images/logos/logo.png"
+	battlefyLogo = "http://s3.amazonaws.com/battlefy-assets/helix/images/logos/logo.png"
 )
 
 func init() {
@@ -26,13 +23,26 @@ func init() {
 
 // OD grabs information about another team
 func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info, err := GetInfo(m.GuildID, m.ChannelID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
+		return
+	}
+
 	if len(m.Content) < 5 {
 		s.ChannelMessageSend(m.ChannelID, "No team!")
 		return
 	}
+
 	name := m.Content[4:]
 	num, err := strconv.Atoi(name)
 	if err != nil {
+		if !info.TournamentLink.Valid {
+			s.ChannelMessageSend(m.ChannelID, "No tournament link for this team.")
+			return
+		}
+
+		tournamentID := strings.Split(info.TournamentLink.String, "/")[5]
 		var info odscraper.TeamInfo
 		names, err := odscraper.FindTeam(tournamentID, name, &info)
 		if err != nil {
@@ -59,7 +69,14 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			s.ChannelMessageSendEmbed(m.ChannelID, embed)
 		}
 	} else {
-		t, err := odscraper.GetOtherTeam(tournamentLink, teamID, num)
+		if !info.TeamID.Valid {
+			s.ChannelMessageSend(m.ChannelID, "No team ID for this team.")
+			return
+		} else if !info.TournamentLink.Valid {
+			s.ChannelMessageSend(m.ChannelID, "No tournament link for this team.")
+			return
+		}
+		t, err := odscraper.GetOtherTeam(info.TournamentLink.String, info.TeamID.String, num)
 		if err != nil {
 			log.Println(err)
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("No data for round %d. :(", num))
