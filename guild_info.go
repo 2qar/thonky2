@@ -66,6 +66,53 @@ type GuildInfo struct {
 	*TeamInfo
 }
 
+// AddTeam adds a team to a guild's list of teams
+func (g *GuildInfo) AddTeam(config *db.TeamConfig) error {
+	team, err := getTeamInfo(config)
+	if err != nil {
+		return err
+	}
+	g.Teams = append(g.Teams, team)
+	return nil
+}
+
+func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
+	var updated bool
+	teamInfo := &TeamInfo{TeamConfig: config}
+	if config.DocKey.Valid {
+		log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
+		var sheet Sheet
+		var err error
+		updated, err = GetSheet(config.DocKey.String, &sheet)
+		if err != nil {
+			return teamInfo, fmt.Errorf("error grabbing sheet for [%s]: %s", config.GuildID, err)
+		}
+		teamInfo.Sheet = &sheet
+	} else {
+		return teamInfo, fmt.Errorf("err: no dockey for guild [%s] with name \"%s\"", config.GuildID, config.TeamName)
+	}
+	err := teamInfo.cacheSheetInfo(!updated)
+	if err != nil {
+		log.Println(err)
+	}
+	go func(t *TeamInfo) {
+		for {
+			time.Sleep(time.Duration(t.UpdateInterval) * time.Minute)
+			log.Printf("bg updating [%s]\n", t.Sheet.ID)
+			updated, err := t.Sheet.Updated()
+			if err != nil {
+				log.Println(err)
+			} else {
+				err = t.Update(!updated)
+				if err != nil {
+					log.Println(err)
+				}
+			}
+		}
+	}(teamInfo)
+	return teamInfo, nil
+}
+
 // GetInfo returns TeamInfo or GuildInfo, depending on what it finds with the given channelID and guildID
 func GetInfo(guildID, channelID string) (*TeamInfo, error) {
 	info := guildInfo[guildID]
@@ -97,51 +144,20 @@ func NewGuildInfo(guildID string) (g *GuildInfo, err error) {
 		return
 	}
 
-	getTeamInfo := func(config *db.TeamConfig) *TeamInfo {
-		var updated bool
-		teamInfo := &TeamInfo{TeamConfig: config}
-		if config.DocKey.Valid {
-			log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
-			var sheet Sheet
-			var err error
-			updated, err = GetSheet(config.DocKey.String, &sheet)
-			if err != nil {
-				log.Println("error grabbing sheet for", config.GuildID, err)
-				return teamInfo
-			}
-			teamInfo.Sheet = &sheet
-		} else {
-			log.Printf("err: no dockey for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
-			return teamInfo
-		}
-		err := teamInfo.cacheSheetInfo(!updated)
-		if err != nil {
-			log.Println(err)
-		}
-		go func(t *TeamInfo) {
-			for {
-				time.Sleep(time.Duration(t.UpdateInterval) * time.Minute)
-				log.Printf("bg updating [%s]\n", t.Sheet.ID)
-				updated, err := t.Sheet.Updated()
-				if err != nil {
-					log.Println(err)
-				} else {
-					err = t.Update(!updated)
-					if err != nil {
-						log.Println(err)
-					}
-				}
-			}
-		}(teamInfo)
-		return teamInfo
+	guildTeam, err := getTeamInfo(config)
+	if err != nil {
+		return nil, err
 	}
-	g = &GuildInfo{TeamInfo: getTeamInfo(config)}
+	g = &GuildInfo{TeamInfo: guildTeam}
 	teams, err := handler.GetTeams(guildID)
 	if err != nil {
 		return
 	}
 	for _, teamConfig := range teams {
-		g.Teams = append(g.Teams, getTeamInfo(teamConfig))
+		err = g.AddTeam(teamConfig)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	return
 }
