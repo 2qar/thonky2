@@ -185,12 +185,14 @@ func getTimeRange(timeStr string) (int, int, error) {
 // dayInt gets a weekday int from a day name.
 func dayInt(dayName string) int {
 	day := -1
-	dayName = strings.ToLower(dayName)
-	for i := 0; i < 7; i++ {
-		currName := strings.ToLower(time.Weekday(i).String())
-		if dayName == currName || dayName[:3] == currName[:3] {
-			day = Weekday(i)
-			break
+	if len(dayName) >= 6 {
+		dayName = strings.ToLower(dayName)
+		for i := 0; i < 7; i++ {
+			currName := strings.ToLower(time.Weekday(i).String())
+			if dayName == currName || dayName[:3] == currName[:3] {
+				day = Weekday(i)
+				break
+			}
 		}
 	}
 	return day
