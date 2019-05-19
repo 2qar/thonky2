@@ -36,6 +36,7 @@ func StartLog() *os.File {
 		panic(err)
 	}
 	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	log.SetFlags(log.Ltime + log.Lshortfile)
 	return logFile
 }
 
