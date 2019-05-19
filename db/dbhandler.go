@@ -36,11 +36,11 @@ type Handler struct {
 	*sqlx.DB
 }
 
-// GetTeam gets config for a team in a server
-func (d *Handler) GetTeam(guildID, name string) (*TeamConfig, error) {
-	team := &TeamConfig{}
-	err := d.Get(team, "SELECT * FROM teams WHERE server_id=$1 AND team_name=$2", guildID, name)
-	return team, err
+// GetTeamName returns the name of a team in a given channel
+func (d *Handler) GetTeamName(channelID string) (string, error) {
+	var teamName string
+	err := d.Get(&teamName, "SELECT team_name FROM teams WHERE $1 = ANY(channels)", channelID)
+	return teamName, err
 }
 
 // GetTeams gets the config for each team in a server
