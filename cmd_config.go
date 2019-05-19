@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"regexp"
+	"strconv"
 
 	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bwmarrin/discordgo"
@@ -18,6 +19,13 @@ func init() {
 
 // AddTeam adds a team to a guild
 func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info := guildInfo[m.GuildID]
+	if info == nil {
+		log.Printf("no info for [%s]\n", m.GuildID)
+		s.ChannelMessageSend(m.GuildID, "No info for this guild.")
+		return
+	}
+
 	if len(args) != 3 {
 		if len(args) == 2 {
 			s.ChannelMessageSend(m.ChannelID, "Bad amount of args; no channel given!")
@@ -69,18 +77,26 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	r.Close()
 
-	template, err := handler.GetGuild(m.GuildID)
+	config, err := handler.GetGuild("0")
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	r, err = handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", m.GuildID, args[1], pq.StringArray([]string{channelID}), template.RemindActivities, template.RemindIntervals, template.UpdateInterval)
+	config.GuildID = m.GuildID
+	config.TeamName = args[1]
+	channelInt, _ := strconv.Atoi(channelID)
+	config.Channels = pq.Int64Array([]int64{int64(channelInt)})
+	r, err = handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	r.Close()
+	defer r.Close()
 
+	err = info.AddTeam(config)
+	if err != nil {
+		log.Println(err)
+	}
 	s.ChannelMessageSend(m.ChannelID, "Added team.")
 	log.Printf("added team %q to guild [%s]\n", args[1], m.GuildID)
 }
