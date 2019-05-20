@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"regexp"
 	"strconv"
@@ -60,22 +61,10 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	defer handler.Close()
 
-	r, err := handler.Query("SELECT team_name FROM teams WHERE $1 = ANY(channels)", channelID)
-	if err != nil {
-		log.Println(err)
-		return
-	} else if r.Next() {
-		defer r.Close()
-		var teamName string
-		err = r.Scan(&teamName)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-		s.ChannelMessageSend(m.ChannelID, "Channel already occupied by "+teamName)
+	if name, err := handler.GetTeamName(args[2][2 : len(args[2])-1]); err == nil {
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Channel already occupied by %q", name))
 		return
 	}
-	r.Close()
 
 	config, err := handler.GetGuild("0")
 	if err != nil {
@@ -86,7 +75,7 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	config.TeamName = args[1]
 	channelInt, _ := strconv.Atoi(channelID)
 	config.Channels = pq.Int64Array([]int64{int64(channelInt)})
-	r, err = handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
+	r, err := handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
 		log.Println(err)
 		return
