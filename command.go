@@ -19,7 +19,7 @@ type Command struct {
 }
 
 // AddAliases adds an alias for a command
-func (c *Command) AddAliases(aliases []string) {
+func (c *Command) AddAliases(aliases ...string) {
 	for _, alias := range aliases {
 		Commands[alias] = c
 	}
