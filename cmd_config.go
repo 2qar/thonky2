@@ -18,6 +18,11 @@ func init() {
 	AddCommand("add_team", "Add a team to the server.", examples, AddTeam)
 }
 
+func isChannel(s string) bool {
+	match, _ := regexp.MatchString(`<#\d{18}>`, s)
+	return match
+}
+
 // AddTeam adds a team to a guild
 func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	info := guildInfo[m.GuildID]
@@ -35,11 +40,7 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}
 		return
 	}
-	matched, err := regexp.MatchString(`<#\d{18}>`, args[2])
-	if err != nil {
-		log.Println(err)
-		return
-	} else if !matched {
+	if !isChannel(args[2]) {
 		s.ChannelMessageSend(m.ChannelID, "Invalid channel.")
 		return
 	}
