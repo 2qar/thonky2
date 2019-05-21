@@ -159,5 +159,5 @@ func NewGuildInfo(guildID string) (g *GuildInfo, err error) {
 			log.Println(err)
 		}
 	}
-	return
+	return g, nil
 }
