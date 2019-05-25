@@ -19,6 +19,8 @@ import (
 )
 
 var (
+	botUserID string
+
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
 
@@ -99,6 +101,8 @@ func main() {
 }
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
+	botUserID = r.User.ID
+
 	for _, guild := range r.Guilds {
 		info, err := NewGuildInfo(guild.ID)
 		if err != nil {

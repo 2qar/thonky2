@@ -29,6 +29,15 @@ func isChannel(s string) bool {
 	return match
 }
 
+// sendPermission checks whether the bot has permission to send messages in a channel
+func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
+	perms, err := s.State.UserChannelPermissions(botUserID, channelID)
+	if err != nil {
+		return false, err
+	}
+	return perms&discordgo.PermissionSendMessages != 0, nil
+}
+
 // AddTeam adds a team to a guild
 func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	info := guildInfo[m.GuildID]
@@ -51,12 +60,11 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 	channelID := args[2][2 : len(args[2])-1]
-	me, err := s.User("@me")
-	perms, err := s.State.UserChannelPermissions(me.ID, channelID)
+	canSend, err := sendPermission(s, channelID)
 	if err != nil {
 		log.Println(err)
 		return
-	} else if perms&discordgo.PermissionSendMessages == 0 {
+	} else if !canSend {
 		s.ChannelMessageSend(m.ChannelID, "I don't have permission to send messages in that channel. :(")
 		return
 	}
@@ -135,6 +143,13 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 				errMsg = fmt.Sprintf("%s already occupied by %q.", arg, name)
 			}
 			s.ChannelMessageSend(m.ChannelID, errMsg)
+			return
+		}
+		canSend, err := sendPermission(s, arg[2:len(arg)-1])
+		if err != nil {
+			log.Println(err)
+		} else if !canSend {
+			s.ChannelMessageSend(m.ChannelID, "I don't have permission to send messages in that channel. :(")
 			return
 		}
 	}
