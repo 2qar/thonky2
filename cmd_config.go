@@ -29,6 +29,11 @@ func isChannel(s string) bool {
 	return match
 }
 
+// channelID gets the channelID from a channel mention, ex. <#477928874450354176> returns 477928874450354176
+func channelID(s string) string {
+	return s[2 : len(s)-1]
+}
+
 // sendPermission checks whether the bot has permission to send messages in a channel
 func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
 	perms, err := s.State.UserChannelPermissions(botUserID, channelID)
@@ -59,8 +64,8 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		s.ChannelMessageSend(m.ChannelID, "Invalid channel.")
 		return
 	}
-	channelID := args[2][2 : len(args[2])-1]
-	canSend, err := sendPermission(s, channelID)
+	chanID := channelID(args[2])
+	canSend, err := sendPermission(s, chanID)
 	if err != nil {
 		log.Println(err)
 		return
@@ -76,7 +81,7 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	defer handler.Close()
 
-	if name, err := handler.GetTeamName(args[2][2 : len(args[2])-1]); err == nil {
+	if name, err := handler.GetTeamName(chanID); err == nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Channel already occupied by %q", name))
 		return
 	}
@@ -88,7 +93,7 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	config.GuildID = m.GuildID
 	config.TeamName = args[1]
-	channelInt, _ := strconv.Atoi(channelID)
+	channelInt, _ := strconv.Atoi(chanID)
 	config.Channels = pq.Int64Array([]int64{int64(channelInt)})
 	r, err := handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
@@ -135,7 +140,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		if !isChannel(arg) {
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid channel %q.", arg))
 			return
-		} else if name, err := handler.GetTeamName(arg[2 : len(arg)-1]); err == nil {
+		} else if name, err := handler.GetTeamName(channelID(arg)); err == nil {
 			var errMsg string
 			if name == info.TeamName {
 				errMsg = arg + " already added."
@@ -163,7 +168,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	for i, channel := range givenChannels {
-		givenChannels[i] = channel[2 : len(channel)-1]
+		givenChannels[i] = channelID(channel)
 	}
 
 	for _, id := range givenChannels {
