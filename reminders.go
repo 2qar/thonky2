@@ -19,6 +19,7 @@ type reminderCheck struct {
 	Session *discordgo.Session
 }
 
+// Run checks if there's an activity coming up, and sends an announcement if it's the first one of the day
 func (r reminderCheck) Run() {
 	for _, info := range guildInfo {
 		if info.DocKey.Valid && info.AnnounceChannel.Valid {
@@ -33,7 +34,7 @@ func (r reminderCheck) Run() {
 				for _, reminder := range info.RemindActivities {
 					if activity == reminder {
 						done = true
-						if i < today.Hour()-15 {
+						if i != today.Hour()-15 {
 							break
 						}
 
