@@ -106,5 +106,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				}
 			}
 		}
+
+		s.ChannelMessageSend(m.ChannelID, "No games today.")
 	}
 }
