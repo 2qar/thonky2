@@ -37,6 +37,19 @@ type match struct {
 	End      time.Time `json:"endDate"`
 }
 
+// getMatches grabs the schedule from the OWL website
+func getMatches() (*schedule, error) {
+	r, err := http.Get("https://api.overwatchleague.com/schedule")
+	if err != nil {
+		return nil, err
+	}
+	defer r.Body.Close()
+
+	var s schedule
+	err = json.NewDecoder(r.Body).Decode(&s)
+	return &s, err
+}
+
 // OWL posts information about Overwatch League games
 func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	if len(args) == 1 || len(args) > 2 {
@@ -44,24 +57,14 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	r, err := http.Get("https://api.overwatchleague.com/schedule")
-	if err != nil {
-		log.Println("err:", err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
-		return
-	}
-	defer r.Body.Close()
-
-	var sched schedule
-	err = json.NewDecoder(r.Body).Decode(&sched)
-	if err != nil {
-		log.Println("err:", err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
-		return
-	}
-
 	switch strings.ToLower(args[1]) {
 	case "today":
+		sched, err := getMatches()
+		if err != nil {
+			log.Println("err:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
+			return
+		}
 		var matches []match
 		now := time.Now()
 		localTZ, _ := time.LoadLocation("America/Los_Angeles")
@@ -108,5 +111,26 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}
 
 		s.ChannelMessageSend(m.ChannelID, "No games today.")
+	case "next":
+		sched, err := getMatches()
+		if err != nil {
+			log.Println("err:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
+			return
+		}
+		for _, stage := range sched.Data.Stages {
+			for _, match := range stage.Matches {
+				if match.Status == "PENDING" {
+					localTZ, _ := time.LoadLocation("America/Los_Angeles")
+					localStart := match.Start.In(localTZ)
+					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Next match is %s vs %s on %s, %s at %s PST.", match.Teams[0].Name, match.Teams[1].Name, localStart.Weekday(), localStart.Format("01/02"), localStart.Format(time.Kitchen)))
+					return
+				}
+			}
+		}
+
+		s.ChannelMessageSend(m.ChannelID, "No games left. :(")
+	default:
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid option %q.", args[1]))
 	}
 }
