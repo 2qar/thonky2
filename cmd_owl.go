@@ -62,6 +62,39 @@ func owlEmbed() *discordgo.MessageEmbed {
 	}
 }
 
+// nextMatchEmbed creates an embed out of a pending OWL match
+func nextMatchEmbed(m *match) *discordgo.MessageEmbed {
+	embed := owlEmbed()
+
+	localTZ, _ := time.LoadLocation("America/Los_Angeles")
+	localStart := m.Start.In(localTZ)
+	embed.Author = &discordgo.MessageEmbedAuthor{
+		URL:  fmt.Sprintf("https://www.overwatchleague.com/en-us/match/%s", m.ID),
+		Name: fmt.Sprintf("%s vs %s, %s at %s PST", m.Teams[0].Name, m.Teams[1].Name, date(&localStart), localStart.Format(time.Kitchen)),
+	}
+
+	untilStr := "Starting in "
+	until := localStart.Sub(time.Now())
+
+	minutes := int(until.Minutes())
+	if minutes >= 60 {
+		hours := int(math.Floor(float64(minutes / 60)))
+		minutes %= 60
+		if hours >= 24 {
+			days := int(math.Floor(float64(hours / 24)))
+			hours %= 24
+			untilStr += fmt.Sprintf("%d days, ", days)
+		}
+		untilStr += addTime(hours, "hour", ", ")
+	}
+	untilStr += addTime(minutes, "minute", "")
+
+	embed.Footer = &discordgo.MessageEmbedFooter{
+		Text: untilStr,
+	}
+	return embed
+}
+
 // getMatches grabs the schedule from the OWL website
 func getMatches() (*schedule, error) {
 	r, err := http.Get("https://api.overwatchleague.com/schedule")
@@ -141,9 +174,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		for _, stage := range sched.Data.Stages {
 			for _, match := range stage.Matches {
 				if match.Status == "PENDING" {
-					localTZ, _ := time.LoadLocation("America/Los_Angeles")
-					localStart := match.Start.In(localTZ)
-					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Next match is %s vs %s on %s, %s at %s PST.", match.Teams[0].Name, match.Teams[1].Name, localStart.Weekday(), date(&localStart), localStart.Format(time.Kitchen)))
+					s.ChannelMessageSendEmbed(m.ChannelID, nextMatchEmbed(&match))
 					return
 				}
 			}
@@ -170,38 +201,11 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			s.ChannelMessageSend(m.ChannelID, "Error parsing live match info.")
 			return
 		}
-		match := live.Data.LiveMatch
+		match := &live.Data.LiveMatch
 
 		var embed *discordgo.MessageEmbed
 		if match.Status == "PENDING" {
-			embed = owlEmbed()
-
-			localTZ, _ := time.LoadLocation("America/Los_Angeles")
-			localStart := match.Start.In(localTZ)
-			embed.Author = &discordgo.MessageEmbedAuthor{
-				URL:  fmt.Sprintf("https://www.overwatchleague.com/en-us/match/%s", m.ID),
-				Name: fmt.Sprintf("%s vs %s, %s at %s PST", match.Teams[0].Name, match.Teams[1].Name, date(&localStart), localStart.Format(time.Kitchen)),
-			}
-
-			untilStr := "Starting in "
-			until := localStart.Sub(time.Now())
-
-			minutes := int(until.Minutes())
-			if minutes >= 60 {
-				hours := int(math.Floor(float64(minutes / 60)))
-				minutes %= 60
-				if hours >= 24 {
-					days := int(math.Floor(float64(hours / 24)))
-					hours %= 24
-					untilStr += fmt.Sprintf("%d days, ", days)
-				}
-				untilStr += addTime(hours, "hour", ", ")
-			}
-			untilStr += addTime(minutes, "minute", "")
-
-			embed.Footer = &discordgo.MessageEmbedFooter{
-				Text: untilStr,
-			}
+			embed = nextMatchEmbed(match)
 		} else {
 			embed = &discordgo.MessageEmbed{}
 		}
