@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ type schedule struct {
 }
 
 type match struct {
+	ID    json.Number
 	Teams [2]struct {
 		Name string
 		Logo string
@@ -35,6 +37,29 @@ type match struct {
 	Timezone string    `json:"timeZone"`
 	Start    time.Time `json:"startDate"`
 	End      time.Time `json:"endDate"`
+}
+
+// date returns a Time in the format month/day
+func date(t *time.Time) string {
+	return t.Format("01/02")
+}
+
+// addTime returns a string that'll never say something stupid like "1 minutes"
+func addTime(t int, s, post string) string {
+	if t == 1 {
+		return "1 " + s + post
+	}
+	return fmt.Sprintf("%d %ss%s", t, s, post)
+}
+
+// owlEmbed returns a template for an OWL web embed
+func owlEmbed() *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Color: 0xFF8C08,
+		Thumbnail: &discordgo.MessageEmbedThumbnail{
+			URL: "https://styleguide.overwatchleague.com/6.8.3/assets/toolkit/images/logo-tracer.png",
+		},
+	}
 }
 
 // getMatches grabs the schedule from the OWL website
@@ -75,18 +100,13 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				if localStart.Day() == now.Day() && localStart.Month() == now.Month() {
 					matches = append(matches, match)
 				} else if len(matches) > 0 {
-					embed := &discordgo.MessageEmbed{
-						Color: 0xFF8C08,
-						Author: &discordgo.MessageEmbedAuthor{
-							URL:  "http://overwatchleague.com/en-us/schedule",
-							Name: fmt.Sprintf("Overwatch League Games on %s, %s", now.Weekday(), now.Format("01/02")),
-						},
-						Footer: &discordgo.MessageEmbedFooter{
-							Text: "Times shown in PST",
-						},
-						Thumbnail: &discordgo.MessageEmbedThumbnail{
-							URL: "https://styleguide.overwatchleague.com/6.8.3/assets/toolkit/images/logo-tracer.png",
-						},
+					embed := owlEmbed()
+					embed.Author = &discordgo.MessageEmbedAuthor{
+						URL:  "http://overwatchleague.com/en-us/schedule",
+						Name: fmt.Sprintf("Overwatch League Games on %s, %s", now.Weekday(), date(&now)),
+					}
+					embed.Footer = &discordgo.MessageEmbedFooter{
+						Text: "Times shown in PST",
 					}
 
 					var foundCurrent bool
@@ -123,13 +143,70 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				if match.Status == "PENDING" {
 					localTZ, _ := time.LoadLocation("America/Los_Angeles")
 					localStart := match.Start.In(localTZ)
-					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Next match is %s vs %s on %s, %s at %s PST.", match.Teams[0].Name, match.Teams[1].Name, localStart.Weekday(), localStart.Format("01/02"), localStart.Format(time.Kitchen)))
+					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Next match is %s vs %s on %s, %s at %s PST.", match.Teams[0].Name, match.Teams[1].Name, localStart.Weekday(), date(&localStart), localStart.Format(time.Kitchen)))
 					return
 				}
 			}
 		}
 
 		s.ChannelMessageSend(m.ChannelID, "No games left. :(")
+	case "now":
+		r, err := http.Get("https://api.overwatchleague.com/live-match")
+		if err != nil {
+			log.Println("err:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error grabbing live match.")
+			return
+		}
+		defer r.Body.Close()
+
+		live := struct {
+			Data struct {
+				LiveMatch match
+			}
+		}{}
+		err = json.NewDecoder(r.Body).Decode(&live)
+		if err != nil {
+			log.Println("err parsing live match:", err)
+			s.ChannelMessageSend(m.ChannelID, "Error parsing live match info.")
+			return
+		}
+		match := live.Data.LiveMatch
+
+		var embed *discordgo.MessageEmbed
+		if match.Status == "PENDING" {
+			embed = owlEmbed()
+
+			localTZ, _ := time.LoadLocation("America/Los_Angeles")
+			localStart := match.Start.In(localTZ)
+			embed.Author = &discordgo.MessageEmbedAuthor{
+				URL:  fmt.Sprintf("https://www.overwatchleague.com/en-us/match/%s", m.ID),
+				Name: fmt.Sprintf("%s vs %s, %s at %s PST", match.Teams[0].Name, match.Teams[1].Name, date(&localStart), localStart.Format(time.Kitchen)),
+			}
+
+			untilStr := "Starting in "
+			until := localStart.Sub(time.Now())
+
+			minutes := int(until.Minutes())
+			if minutes >= 60 {
+				hours := int(math.Floor(float64(minutes / 60)))
+				minutes %= 60
+				if hours >= 24 {
+					days := int(math.Floor(float64(hours / 24)))
+					hours %= 24
+					untilStr += fmt.Sprintf("%d days, ", days)
+				}
+				untilStr += addTime(hours, "hour", ", ")
+			}
+			untilStr += addTime(minutes, "minute", "")
+
+			embed.Footer = &discordgo.MessageEmbedFooter{
+				Text: untilStr,
+			}
+		} else {
+			embed = &discordgo.MessageEmbed{}
+		}
+
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	default:
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid option %q.", args[1]))
 	}
