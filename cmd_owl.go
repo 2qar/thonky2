@@ -33,6 +33,9 @@ type match struct {
 		Name string
 		Logo string
 	} `json:"competitors"`
+	Scores [2]struct {
+		Value int
+	}
 	Status   string
 	Timezone string    `json:"timeZone"`
 	Start    time.Time `json:"startDate"`
@@ -48,8 +51,10 @@ func date(t *time.Time) string {
 func addTime(t int, s, post string) string {
 	if t == 1 {
 		return "1 " + s + post
+	} else if t > 0 {
+		return fmt.Sprintf("%d %ss%s", t, s, post)
 	}
-	return fmt.Sprintf("%d %ss%s", t, s, post)
+	return ""
 }
 
 // owlEmbed returns a template for an OWL web embed
@@ -204,10 +209,19 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		match := &live.Data.LiveMatch
 
 		var embed *discordgo.MessageEmbed
-		if match.Status == "PENDING" {
+		if match.Status == "PENDING" || match.Status == "" {
 			embed = nextMatchEmbed(match)
 		} else {
-			embed = &discordgo.MessageEmbed{}
+			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Color: 0x633FA3,
+				Title: fmt.Sprintf("%s %s - %s %s", timeEmotes[match.Scores[0].Value], match.Teams[0].Name, match.Teams[1].Name, timeEmotes[match.Scores[1].Value]),
+				URL:   "https://www.twitch.tv/overwatchleague",
+				Video: &discordgo.MessageEmbedVideo{
+					URL:    "https://player.twitch.tv/?channel=overwatchleague&autoplay=true",
+					Width:  620,
+					Height: 378,
+				},
+			})
 		}
 
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
