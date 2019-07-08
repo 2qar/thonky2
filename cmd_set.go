@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
@@ -34,7 +33,7 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 
 	if len(args) >= 3 {
-		day := dayInt(args[1])
+		day := info.Week.DayInt(args[1])
 		if day != -1 {
 			// update w/ day
 			log.Printf("update day %q w/ index %d\n", args[1], day)
@@ -62,7 +61,7 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}
 
 		if player != nil {
-			day = dayInt(args[2])
+			day = info.Week.DayInt(args[2])
 			if day != -1 {
 				// update w/ player
 				log.Printf("update player %q\n", player.Name)
@@ -180,22 +179,6 @@ func getTimeRange(timeStr string) (int, int, error) {
 	rangeStart := timeRange[0] - 4
 	rangeEnd := rangeStart + (timeRange[1] - timeRange[0])
 	return rangeStart, rangeEnd, nil
-}
-
-// dayInt gets a weekday int from a day name.
-func dayInt(dayName string) int {
-	day := -1
-	if len(dayName) >= 6 {
-		dayName = strings.ToLower(dayName)
-		for i := 0; i < 7; i++ {
-			currName := strings.ToLower(time.Weekday(i).String())
-			if dayName == currName || dayName[:3] == currName[:3] {
-				day = Weekday(i)
-				break
-			}
-		}
-	}
-	return day
 }
 
 // parseArgs takes a list of unformatted arguments and tries to match them with a given list of valid arguments.

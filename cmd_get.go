@@ -60,7 +60,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
 				return
 			}
-			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), Weekday(int(time.Now().Weekday())))
+			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), info.Week.Weekday(int(time.Now().Weekday())))
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
@@ -130,7 +130,7 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 			}
 		}
 		var dayName string
-		if i == Weekday(int(time.Now().Weekday())) {
+		if i == w.Weekday(int(time.Now().Weekday())) {
 			dayName = "**" + w.Days[i] + "**"
 		} else {
 			dayName = w.Days[i]
