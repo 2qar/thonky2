@@ -25,7 +25,7 @@ func (r reminderCheck) Run() {
 		if info.DocKey.Valid && info.AnnounceChannel.Valid {
 			today := time.Now()
 
-			activities := info.Week.ActivitiesOn(Weekday(int(today.Weekday())))
+			activities := info.Week.ActivitiesOn(info.Week.Weekday(int(today.Weekday())))
 			var done bool
 			for i, activity := range activities {
 				if done {
