@@ -9,7 +9,10 @@ import (
 	"github.com/bigheadgeorge/thonky2/db"
 )
 
-var guildInfo = map[string]*GuildInfo{}
+var (
+	guildInfo = map[string]*GuildInfo{}
+	sheetPool = map[string]*Sheet{}
+)
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
@@ -81,6 +84,11 @@ func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
 	teamInfo := &TeamInfo{TeamConfig: config}
 	if config.DocKey.Valid {
 		log.Printf("grabbing sheet for guild [%s] with name \"%s\"\n", config.GuildID, config.TeamName)
+		if sheetPool[config.DocKey.String] != nil {
+			log.Printf("grabbed sheet for guild [%s] with name %q from pool", config.GuildID, config.TeamName)
+			teamInfo.Sheet = sheetPool[config.DocKey.String]
+			return teamInfo, nil
+		}
 		var sheet Sheet
 		var err error
 		updated, err = GetSheet(config.DocKey.String, &sheet)
@@ -88,6 +96,7 @@ func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
 			return teamInfo, fmt.Errorf("error grabbing sheet for [%s]: %s", config.GuildID, err)
 		}
 		teamInfo.Sheet = &sheet
+		sheetPool[config.DocKey.String] = &sheet
 	} else {
 		return teamInfo, fmt.Errorf("err: no dockey for guild [%s] with name \"%s\"", config.GuildID, config.TeamName)
 	}
