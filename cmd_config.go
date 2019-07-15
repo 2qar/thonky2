@@ -93,8 +93,13 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	config.GuildID = m.GuildID
 	config.TeamName = args[1]
-	channelInt, _ := strconv.Atoi(chanID)
-	config.Channels = pq.Int64Array([]int64{int64(channelInt)})
+	channelInt, err := strconv.ParseInt(chanID, 10, 64)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error adding team, something stupid happened")
+		return
+	}
+	config.Channels = pq.Int64Array([]int64{channelInt})
 	r, err := handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
 		log.Println(err)
@@ -172,13 +177,13 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	for _, id := range givenChannels {
-		i, err := strconv.Atoi(id)
+		i, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
 			log.Println(err)
 			s.ChannelMessageSend(m.ChannelID, "Error updating channels.")
 			return
 		}
-		info.Channels = append(info.Channels, int64(i))
+		info.Channels = append(info.Channels, i)
 	}
 
 	r, err := handler.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", info.Channels, m.GuildID, info.TeamName)
