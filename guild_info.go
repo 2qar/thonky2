@@ -16,10 +16,7 @@ var (
 
 // TeamInfo stores info about a team
 type TeamInfo struct {
-	Sheet    *Sheet
-	Players  []*Player
-	Week     *Week
-	Updating bool
+	*Sheet
 	*db.TeamConfig
 }
 

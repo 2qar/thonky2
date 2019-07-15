@@ -14,10 +14,13 @@ import (
 
 // Sheet wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
 type Sheet struct {
-	LastModified    *time.Time
-	PlayerCache     []*Player
-	WeekCache       *Week
 	ValidActivities []string
+	Players         []*Player
+	Week            *Week
+	Updating        bool
+	lastModified    *time.Time
+	playerCache     []*Player
+	weekCache       *Week
 	*spreadsheet.Spreadsheet
 }
 
@@ -37,7 +40,7 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 		}
 		var t time.Time
 		err = json.Unmarshal(b, &t)
-		s.LastModified = &t
+		s.lastModified = &t
 		updated, err = s.Updated()
 		if err != nil {
 			log.Println("error grabbing s.Updated():", err)
@@ -56,7 +59,7 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 		if err != nil {
 			return
 		}
-		s.PlayerCache = players
+		s.playerCache = players
 
 		b, err = loadSheetAttr("week", sheetID)
 		if err != nil {
@@ -67,7 +70,7 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 		if err != nil {
 			return
 		}
-		s.WeekCache = week
+		s.weekCache = week
 
 		b, err = loadSheetAttr("activities", sheetID)
 		if err != nil {
@@ -139,7 +142,7 @@ func (s *Sheet) Updated() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return lastModified.Before(*s.LastModified) || lastModified.Equal(*s.LastModified), nil
+	return lastModified.Before(*s.lastModified) || lastModified.Equal(*s.lastModified), nil
 }
 
 // UpdateModified syncs the sheet's modified time with Google Drive's time
@@ -148,7 +151,7 @@ func (s *Sheet) UpdateModified() error {
 	if err != nil {
 		return err
 	}
-	s.LastModified = lastModified
+	s.lastModified = lastModified
 	return nil
 }
 
@@ -174,8 +177,8 @@ func (s *Sheet) GetPlayers() ([]*Player, error) {
 	updated, err := s.Updated()
 	if err != nil {
 		return []*Player{}, nil
-	} else if updated && s.PlayerCache != nil {
-		return s.PlayerCache, nil
+	} else if updated && s.playerCache != nil {
+		return s.playerCache, nil
 	}
 
 	sheet, err := s.SheetByTitle("Team Availability")
@@ -216,7 +219,7 @@ func (s *Sheet) GetPlayers() ([]*Player, error) {
 		p := <-pCh
 		players = append(players, &p)
 	}
-	s.PlayerCache = players
+	s.playerCache = players
 	return players, nil
 }
 
@@ -225,8 +228,8 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	updated, err := s.Updated()
 	if err != nil {
 		return nil, nil
-	} else if updated && s.WeekCache != nil {
-		return s.WeekCache, nil
+	} else if updated && s.weekCache != nil {
+		return s.weekCache, nil
 	}
 
 	sheet, err := s.SheetByTitle("Weekly Schedule")
@@ -248,7 +251,7 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	week.Days = &days
 	week.Cells = &cells
 
-	s.WeekCache = week
+	s.weekCache = week
 	return week, err
 }
 
@@ -268,16 +271,16 @@ func (s *Sheet) Save() (err error) {
 		}
 	}
 
-	err = saveSheetAttr(s.LastModified, "modified", s.ID)
+	err = saveSheetAttr(s.lastModified, "modified", s.ID)
 	if err != nil {
 		return
 	}
 
-	err = saveSheetAttr(s.PlayerCache, "players", s.ID)
+	err = saveSheetAttr(s.playerCache, "players", s.ID)
 	if err != nil {
 		return
 	}
-	err = saveSheetAttr(s.WeekCache, "week", s.ID)
+	err = saveSheetAttr(s.weekCache, "week", s.ID)
 	if err != nil {
 		return
 	}
