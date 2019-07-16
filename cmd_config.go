@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -22,6 +23,11 @@ func init() {
 		{"!add_channels #general-2 #general-3", "Add #general-2 and #general-3 to the team in this channel."},
 	}
 	AddCommand("add_channel", "Add one or more channels to a team.", examples, AddChannels).AddAliases("add_channels")
+
+	examples = [][2]string{
+		{"!save", "Save the current week schedule as default"},
+	}
+	AddCommand("save", "Save the week schedule", examples, Save)
 }
 
 func isChannel(s string) bool {
@@ -195,4 +201,50 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	s.ChannelMessageSend(m.ChannelID, "Added channels.")
+}
+
+// Save saves a sheet's current week schedule for resetting to
+func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info, err := GetInfo(m.GuildID, m.ChannelID)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
+	}
+
+	var b []byte
+	b, err = json.Marshal(info.Week)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error encoding schedule, something stupid happened")
+		return
+	}
+
+	handler, err := db.NewHandler()
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error connecting to database, something stupid happened")
+	}
+	defer handler.Close()
+
+	r, err := handler.Query("SELECT id FROM sheet_info WHERE id = $1", info.DocKey)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error querying database, something stupid happened")
+	}
+	defer r.Close()
+
+	if r.Next() {
+		_, err := handler.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, info.DocKey)
+		if err != nil {
+			log.Println(err)
+			s.ChannelMessageSend(m.ChannelID, "Error updating default")
+		}
+	} else {
+		_, err := handler.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", info.DocKey, b)
+		if err != nil {
+			log.Println(err)
+			s.ChannelMessageSend(m.ChannelID, "Error setting default")
+		}
+	}
+	s.ChannelMessageSend(m.ChannelID, "Updated default week schedule. :)")
 }

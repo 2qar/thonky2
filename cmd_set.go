@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bwmarrin/discordgo"
+	"github.com/jmoiron/sqlx/types"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
@@ -19,6 +21,11 @@ func init() {
 		{"Give one response over a range to set it all to that one response:", "!set monday 4-10 free"},
 	}
 	AddCommand("set", "Update information on the configured spreadsheet.", examples, Set)
+
+	examples = [][2]string{
+		{"!reset", "Load a given default week schedule (use !save to do that)"},
+	}
+	AddCommand("reset", "Reset the week schedule on a sheet to default", examples, Reset)
 }
 
 // Set is used for updating info on a Spreadsheet
@@ -92,7 +99,63 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	s.ChannelMessageSend(m.ChannelID, "weird amount of args")
 }
 
-func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string) error {
+// Reset loads the default week schedule for a sheet
+func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info, err := GetInfo(m.GuildID, m.ChannelID)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
+	}
+
+	handler, err := db.NewHandler()
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error connecting to database, something stupid happened")
+	}
+	defer handler.Close()
+
+	var j types.JSONText
+	err = handler.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", info.DocKey)
+	if err != nil {
+		if err.Error() == "sql: no rows in result set" {
+			s.ChannelMessageSend(m.ChannelID, "No default week schedule for this sheet")
+		} else {
+			log.Println(err)
+			s.ChannelMessageSend(m.ChannelID, "Error loading default week schedule")
+		}
+		return
+	}
+
+	sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error grabbing week schedule")
+		return
+	}
+
+	var w Week
+	err = j.Unmarshal(&w)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error parsing default week schedule, something stupid happened")
+		return
+	}
+
+	activities := w.Values()
+	for i, c := range info.Week.Cells {
+		update(sheet, c[:], activities[i][:])
+	}
+	err = sheet.Synchronize()
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error synchronizing sheets")
+		return
+	}
+
+	s.ChannelMessageSend(m.ChannelID, "Loaded default week schedule. :)")
+}
+
+func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string) {
 	safeUpdate := func(cell *spreadsheet.Cell, i int) {
 		if cell.Value != newValues[i] {
 			sheet.Update(int(cell.Row), int(cell.Column), newValues[i])
@@ -108,8 +171,6 @@ func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []str
 			safeUpdate(cell, 0)
 		}
 	}
-	err := sheet.Synchronize()
-	return err
 }
 
 func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart int, args, validArgs []string) error {
@@ -132,7 +193,8 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 			return fmt.Errorf("Invalid amount of activities for this range: %d cells =/= %d responses", len(updateCells), len(parsed))
 		}
 
-		return update(sheet, updateCells, parsed)
+		update(sheet, updateCells, parsed)
+		return sheet.Synchronize()
 	} else if i, err := strconv.Atoi(args[valueStart]); err == nil {
 		if i < 4 {
 			return fmt.Errorf("Invalid time: %d < 4", i)
@@ -144,7 +206,8 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 			return fmt.Errorf("Too many arguments: %d != 1", len(parsed))
 		}
 
-		return update(sheet, []*spreadsheet.Cell{cells[i-4]}, parsed)
+		update(sheet, []*spreadsheet.Cell{cells[i-4]}, parsed)
+		return sheet.Synchronize()
 	} else {
 		parsed, err := parseArgs(args[valueStart:], validArgs)
 		if err != nil {
@@ -157,7 +220,8 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 		for _, cell := range cells {
 			updateCells = append(updateCells, cell)
 		}
-		return update(sheet, updateCells, parsed)
+		update(sheet, updateCells, parsed)
+		return sheet.Synchronize()
 	}
 }
 
