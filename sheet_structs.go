@@ -47,8 +47,9 @@ func (p *Player) AvailabilityAt(day, time, start int) string {
 
 // Week stores the schedule for the week
 type Week struct {
-	Date string
-	Days *[7]string
+	Date      string
+	Days      *[7]string
+	StartTime int
 	Container
 }
 

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -250,6 +251,14 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	}
 	week.Days = &days
 	week.Cells = &cells
+
+	startStr := strings.Split(sheet.Rows[1][2].Value, "-")[0]
+	var startTime int
+	startTime, err = strconv.Atoi(startStr)
+	if err != nil {
+		return &Week{}, err
+	}
+	week.StartTime = startTime
 
 	s.weekCache = week
 	return week, err

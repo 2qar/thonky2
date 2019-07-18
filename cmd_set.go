@@ -49,7 +49,7 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				log.Println(err)
 				return
 			}
-			err = tryUpdate(sheet, info.Week.Cells[day], 2, args, info.Sheet.ValidActivities)
+			err = tryUpdate(sheet, info.Week.Cells[day], info.Week.StartTime, 2, args, info.Sheet.ValidActivities)
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, err.Error())
@@ -78,7 +78,7 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing %s's sheet.", player.Name))
 					return
 				}
-				err = tryUpdate(sheet, player.Cells[day], 3, args, []string{"Yes", "Maybe", "No"})
+				err = tryUpdate(sheet, player.Cells[day], info.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"})
 				if err != nil {
 					log.Println(err)
 					s.ChannelMessageSend(m.ChannelID, err.Error())
@@ -173,9 +173,9 @@ func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []str
 	}
 }
 
-func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart int, args, validArgs []string) error {
+func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, startTime, valueStart int, args, validArgs []string) error {
 	if match, _ := regexp.MatchString(`\d{1,2}-\d{1,2}`, args[valueStart]); match {
-		rangeStart, rangeEnd, err := getTimeRange(args[valueStart])
+		rangeStart, rangeEnd, err := getTimeRange(args[valueStart], startTime)
 		if err != nil {
 			return err
 		}
@@ -196,8 +196,8 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 		update(sheet, updateCells, parsed)
 		return sheet.Synchronize()
 	} else if i, err := strconv.Atoi(args[valueStart]); err == nil {
-		if i < 4 {
-			return fmt.Errorf("Invalid time: %d < 4", i)
+		if i < startTime {
+			return fmt.Errorf("Invalid time: %d < %d", i, startTime)
 		}
 		parsed, err := parseArgs(args[valueStart+1:], validArgs)
 		if err != nil {
@@ -225,7 +225,7 @@ func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, valueStart 
 	}
 }
 
-func getTimeRange(timeStr string) (int, int, error) {
+func getTimeRange(timeStr string, startTime int) (int, int, error) {
 	timeStrings := strings.Split(timeStr, "-")
 	var timeRange [2]int
 	for i, timeStr := range timeStrings {
@@ -235,12 +235,12 @@ func getTimeRange(timeStr string) (int, int, error) {
 		}
 		timeRange[i] = time
 	}
-	if timeRange[0] < 4 {
+	if timeRange[0] < startTime {
 		return -1, -1, fmt.Errorf("Invalid start time")
 	} else if timeRange[0] > timeRange[1] {
 		return -1, -1, fmt.Errorf("Invalid time range: first time > second time")
 	}
-	rangeStart := timeRange[0] - 4
+	rangeStart := timeRange[0] - startTime
 	rangeEnd := rangeStart + (timeRange[1] - timeRange[0])
 	return rangeStart, rangeEnd, nil
 }

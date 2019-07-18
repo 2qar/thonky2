@@ -101,7 +101,7 @@ func addTimeField(e *discordgo.MessageEmbed, title string, startTime int) {
 // formatWeek formats week information into a Discord embed
 func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.MessageEmbed {
 	embed := baseEmbed("Week of "+w.Date, sheetLink)
-	addTimeField(embed, "Times", 4)
+	addTimeField(embed, "Times", w.StartTime)
 	emojiGuild, err := s.Guild("437847669839495168")
 	if err != nil {
 		return embed
@@ -143,7 +143,7 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 
 func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day int) *discordgo.MessageEmbed {
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
-	addTimeField(embed, "Players", 4)
+	addTimeField(embed, "Players", w.StartTime)
 
 	roleEmoji := func(role string) string {
 		switch role {
