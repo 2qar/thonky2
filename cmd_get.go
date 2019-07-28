@@ -108,10 +108,12 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 	}
 
 	days := w.Values()
+	today := w.Weekday(int(time.Now().Weekday()))
 	for i := 0; i < 7; i++ {
 		var activityEmojis []string
+		currDay := (i + today) % 7
 		for j := 0; j < 6; j++ {
-			activity := days[i][j]
+			activity := days[currDay][j]
 			if activity == "" || activity == "TBD" {
 				activityEmojis = append(activityEmojis, ":grey_question:")
 				continue
@@ -130,10 +132,10 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 			}
 		}
 		var dayName string
-		if i == w.Weekday(int(time.Now().Weekday())) {
-			dayName = "**" + w.Days[i] + "**"
+		if currDay == today {
+			dayName = "**" + w.Days[currDay] + "**"
 		} else {
-			dayName = w.Days[i]
+			dayName = w.Days[currDay]
 		}
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: dayName, Value: strings.Join(activityEmojis, ", "), Inline: false})
 	}
