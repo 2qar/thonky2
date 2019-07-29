@@ -12,6 +12,8 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
@@ -52,6 +54,15 @@ func main() {
 	} else if config.GoogleAPIKey == "" {
 		panic("no google api key in config.json")
 	}
+
+	// cache oauth token so web flow doesn't happen during normal usage
+	if _, err = ioutil.ReadFile("cache/token.json"); os.IsNotExist(err) {
+		_, err = GoogleClient("https://www.googleapis.com/auth/script.projects.readonly", "https://www.googleapis.com/auth/spreadsheets")
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	d, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		panic(err)
@@ -65,10 +76,15 @@ func main() {
 		panic(err)
 	}
 
-	Service, err = spreadsheet.NewService()
+	b, err = ioutil.ReadFile("service_account.json")
 	if err != nil {
 		panic(err)
 	}
+	c, err := google.JWTConfigFromJSON(b, spreadsheet.Scope)
+	if err != nil {
+		panic(err)
+	}
+	Service = spreadsheet.NewServiceWithClient(c.Client(oauth2.NoContext))
 
 	ctx := context.Background()
 	opt := option.WithAPIKey(config.GoogleAPIKey)
