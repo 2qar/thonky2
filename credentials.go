@@ -24,11 +24,7 @@ func GoogleClient(scope ...string) (*http.Client, error) {
 	var t *oauth2.Token
 	ctx := context.Background()
 	if b, err = ioutil.ReadFile("cache/token.json"); err == nil {
-		creds, err := google.CredentialsFromJSON(ctx, b, scope...)
-		if err != nil {
-			return nil, err
-		}
-		t, err = creds.TokenSource.Token()
+		err = json.Unmarshal(b, &t)
 		if err != nil {
 			return nil, err
 		}
