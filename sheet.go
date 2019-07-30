@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/api/option"
+	"google.golang.org/api/script/v1"
 	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
@@ -251,6 +254,31 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	}
 	week.Days = &days
 	week.Cells = &cells
+
+	c, err := GoogleClient()
+	if err != nil {
+		return nil, err
+	}
+	service, err := script.NewService(context.Background(), option.WithHTTPClient(c))
+	if err != nil {
+		return nil, err
+	}
+	req := &script.ExecutionRequest{
+		Function:   "getCellNotes",
+		Parameters: []interface{}{s.ID, "C3:H9"},
+	}
+	o, err := script.NewScriptsService(service).Run("1LPgef8gEDpefvna6p9AZVKrqvpNqWVxRD6yOhYZgFSs3QawU1ktypVEm", req).Do()
+	if err != nil {
+		return nil, err
+	}
+	result := struct {
+		Result [7][6]string
+	}{}
+	err = json.Unmarshal(o.Response, &result)
+	if err != nil {
+		return nil, err
+	}
+	week.Notes = &result.Result
 
 	startStr := strings.Split(sheet.Rows[1][2].Value, "-")[0]
 	var startTime int
