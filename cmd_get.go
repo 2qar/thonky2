@@ -38,7 +38,8 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 
 	if len(args) == 2 {
-		if args[1] == "week" {
+		switch args[1] {
+		case "week":
 			log.Println("getting week")
 			if info.Week == nil {
 				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
@@ -51,7 +52,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
 			}
 			log.Println("sent week :)")
-		} else if args[1] == "today" {
+		case "today":
 			log.Println("getting today")
 			if info.Week == nil {
 				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
@@ -65,6 +66,32 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, err.Error())
+			}
+		case "unscheduled":
+			log.Println("getting unscheduled")
+			embed := baseEmbed("Open Scrims", info.SheetLink())
+			addTimeField(embed, "Times")
+
+			// TODO: rewrite formatWeek so it can be used here and "!get week"
+			for i, row := range info.Week.Values() {
+				var open string
+				for j, activity := range row {
+					if activity == "Scrim" && info.Week.Notes[i][j] == "" {
+						open += ":regional_indicator_o:"
+					} else {
+						open += ":black_large_square:"
+					}
+					if j < 5 {
+						open += ", "
+					}
+				}
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: info.Week.Days[i], Value: open, Inline: false})
+			}
+
+			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			if err != nil {
+				log.Println(err)
+				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error sending embed: %s", err))
 			}
 		}
 	}
