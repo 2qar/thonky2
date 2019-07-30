@@ -10,8 +10,13 @@ import (
 	"net/http"
 )
 
+const (
+	apiBase = "https://googleapis.com/auth/"
+	scope   = []string{apiBase + "script.projects.readonly", apiBase + "spreadsheets"}
+)
+
 // GoogleClient returns an authenticated HTTP client for accessing Google APIs
-func GoogleClient(scope ...string) (*http.Client, error) {
+func GoogleClient() (*http.Client, error) {
 	b, err := ioutil.ReadFile("client_secret.json")
 	if err != nil {
 		return nil, err

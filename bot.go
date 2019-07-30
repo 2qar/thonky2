@@ -57,7 +57,7 @@ func main() {
 
 	// cache oauth token so web flow doesn't happen during normal usage
 	if _, err = ioutil.ReadFile("cache/token.json"); os.IsNotExist(err) {
-		_, err = GoogleClient("https://www.googleapis.com/auth/script.projects.readonly", "https://www.googleapis.com/auth/spreadsheets")
+		_, err = GoogleClient()
 		if err != nil {
 			panic(err)
 		}
