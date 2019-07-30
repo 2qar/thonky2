@@ -82,3 +82,8 @@ func (w *Week) Weekday(day int) int {
 	}
 	return Weekday(day)
 }
+
+// Today returns today based on whether Sunday is first or not
+func (w *Week) Today() int {
+	return w.Weekday(int(time.Now().Weekday()))
+}

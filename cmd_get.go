@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -61,7 +60,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
 				return
 			}
-			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), info.Week.Weekday(int(time.Now().Weekday())))
+			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), info.Week.Today())
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
@@ -70,13 +69,15 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		case "unscheduled":
 			log.Println("getting unscheduled")
 			embed := baseEmbed("Open Scrims", info.SheetLink())
-			addTimeField(embed, "Times")
+			addTimeField(embed, "Times", info.Week.StartTime)
 
-			// TODO: rewrite formatWeek so it can be used here and "!get week"
-			for i, row := range info.Week.Values() {
+			today := info.Week.Today()
+			activities := info.Week.Values()
+			for i := 0; i < 7; i++ {
+				currDay := (i + today) % 7
 				var open string
-				for j, activity := range row {
-					if activity == "Scrim" && info.Week.Notes[i][j] == "" {
+				for j, activity := range activities[currDay] {
+					if activity == "Scrim" && info.Week.Notes[currDay][j] == "" {
 						open += ":regional_indicator_o:"
 					} else {
 						open += ":black_large_square:"
@@ -85,7 +86,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 						open += ", "
 					}
 				}
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: info.Week.Days[i], Value: open, Inline: false})
+				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: info.Week.Days[currDay], Value: open, Inline: false})
 			}
 
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
@@ -135,7 +136,7 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 	}
 
 	days := w.Values()
-	today := w.Weekday(int(time.Now().Weekday()))
+	today := w.Today()
 	for i := 0; i < 7; i++ {
 		var activityEmojis []string
 		currDay := (i + today) % 7
