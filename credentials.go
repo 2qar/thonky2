@@ -10,9 +10,10 @@ import (
 	"net/http"
 )
 
+var scope = []string{apiBase + "script.projects.readonly", apiBase + "spreadsheets"}
+
 const (
 	apiBase = "https://googleapis.com/auth/"
-	scope   = []string{apiBase + "script.projects.readonly", apiBase + "spreadsheets"}
 )
 
 // GoogleClient returns an authenticated HTTP client for accessing Google APIs
