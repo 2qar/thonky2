@@ -241,6 +241,8 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	date := strings.Split(sheet.Rows[2][1].Value, ", ")[1]
 
 	week := &Week{Date: date}
+	week.Cells = &[7][6]*spreadsheet.Cell{}
+	week.Notes = &[7][6]string{}
 	var days [7]string
 	for i := 2; i < 9; i++ {
 		days[i-2] = sheet.Rows[i][1].Value
