@@ -218,7 +218,6 @@ func updateCell(sheet *spreadsheet.Sheet, cell *spreadsheet.Cell, val string) {
 
 func updateNote(sheet *spreadsheet.Sheet, cell *spreadsheet.Cell, val string) {
 	if cell.Note != val {
-		lowerNote := strings.ToLower(val)
 		sheet.UpdateNote(int(cell.Row), int(cell.Column), val)
 		cell.Note = val
 	}
