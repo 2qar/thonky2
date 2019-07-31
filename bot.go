@@ -11,13 +11,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/bigheadgeorge/spreadsheet"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
-	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
 )
 
 var (
@@ -53,14 +53,6 @@ func main() {
 		panic(fmt.Errorf("no token in config.json"))
 	} else if config.GoogleAPIKey == "" {
 		panic("no google api key in config.json")
-	}
-
-	// cache oauth token so web flow doesn't happen during normal usage
-	if _, err = ioutil.ReadFile("cache/token.json"); os.IsNotExist(err) {
-		_, err = GoogleClient()
-		if err != nil {
-			panic(err)
-		}
 	}
 
 	d, err := discordgo.New("Bot " + config.Token)

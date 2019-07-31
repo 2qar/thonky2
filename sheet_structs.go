@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/Iwark/spreadsheet.v2"
+	"github.com/bigheadgeorge/spreadsheet"
 )
 
 // Container stores cells in a format that fits each day of the week.

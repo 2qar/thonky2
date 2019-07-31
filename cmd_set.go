@@ -10,7 +10,7 @@ import (
 	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bwmarrin/discordgo"
 	"github.com/jmoiron/sqlx/types"
-	spreadsheet "gopkg.in/Iwark/spreadsheet.v2"
+	"github.com/bigheadgeorge/spreadsheet"
 )
 
 func init() {
