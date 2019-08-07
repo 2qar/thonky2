@@ -242,13 +242,11 @@ func (s *Sheet) GetWeek() (*Week, error) {
 
 	week := &Week{Date: date}
 	week.Cells = &[7][6]*spreadsheet.Cell{}
-	week.Notes = &[7][6]string{}
 	var days [7]string
 	for i := 2; i < 9; i++ {
 		days[i-2] = sheet.Rows[i][1].Value
 		for j := 2; j < 8; j++ {
 			week.Cells[i-2][j-2] = &sheet.Rows[i][j]
-			week.Notes[i-2][j-2] = sheet.Rows[i][j].Note
 		}
 	}
 	week.Days = &days

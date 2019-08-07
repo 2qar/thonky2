@@ -50,7 +50,6 @@ type Week struct {
 	Date      string
 	Days      *[7]string
 	StartTime int
-	Notes     *[7][6]string
 	Container
 }
 

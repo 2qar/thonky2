@@ -77,7 +77,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				currDay := (i + today) % 7
 				var open string
 				for j, activity := range activities[currDay] {
-					if activity == "Scrim" && info.Week.Notes[currDay][j] == "" {
+					if activity == "Scrim" && info.Week.Cells[currDay][j].Note == "" {
 						open += ":regional_indicator_o:"
 					} else {
 						open += ":black_large_square:"
