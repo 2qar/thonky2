@@ -103,14 +103,16 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 
 // sheetLastModified returns the sheet's last modified time according to Google Drive
 func sheetLastModified(sheetID string) (*time.Time, error) {
-	call := FilesService.Get(sheetID)
-	call = call.Fields("modifiedTime")
-	f, err := call.Do()
+	file := struct {
+		ModifiedTime string
+	}{}
+	url := "https://www.googleapis.com/drive/v3/files/" + sheetID + "?fields=modifiedTime"
+	err := Client.GetStruct(&file, url)
 	if err != nil {
 		return nil, err
 	}
-	timeString := f.ModifiedTime[:strings.LastIndex(f.ModifiedTime, ".")]
-	t, err := time.Parse("2006-01-02T15:04:05", timeString)
+	file.ModifiedTime = file.ModifiedTime[:strings.LastIndex(file.ModifiedTime, ".")]
+	t, err := time.Parse("2006-01-02T15:04:05", file.ModifiedTime)
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +120,23 @@ func sheetLastModified(sheetID string) (*time.Time, error) {
 }
 
 func sheetValidActivities(sheetID string) ([]string, error) {
-	call := SpreadsheetsService.Get(sheetID)
-	call.Fields("sheets")
-	file, err := call.Do()
+	file := struct {
+		Sheets []struct {
+			ConditionalFormats []struct {
+				BooleanRule struct {
+					Condition struct {
+						Values []struct {
+							UserEnteredValue string
+						}
+					}
+				}
+			}
+			Properties struct {
+				Title string
+			}
+		}
+	}{}
+	err := Client.GetStruct(&file, "https://sheets.googleapis.com/v4/spreadsheets/"+sheetID)
 	if err != nil {
 		return []string{}, err
 	}

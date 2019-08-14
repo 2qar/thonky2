@@ -13,24 +13,17 @@ import (
 
 	"github.com/bigheadgeorge/spreadsheet"
 	"github.com/bwmarrin/discordgo"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 )
 
 var (
 	botUserID string
 
+	// Client is an authenticated http client for accessing Google APIs
+	Client *authClient
+
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
-
-	// FilesService is the service used to grab spreadsheet metadata
-	FilesService *drive.FilesService
-
-	// SpreadsheetsService is the service for grabbing Spreadsheet info not exposed by gopkg.in/Iwark/spreadsheet.v2
-	SpreadsheetsService *sheets.SpreadsheetsService
 )
 
 func main() {
@@ -72,25 +65,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	c, err := google.JWTConfigFromJSON(b, spreadsheet.Scope)
+	c, err := google.JWTConfigFromJSON(b, spreadsheet.Scope, "https://www.googleapis.com/auth/drive.metadata.readonly")
 	if err != nil {
 		panic(err)
 	}
-	Service = spreadsheet.NewServiceWithClient(c.Client(oauth2.NoContext))
-
-	ctx := context.Background()
-	opt := option.WithAPIKey(config.GoogleAPIKey)
-	service, err := drive.NewService(ctx, opt)
-	if err != nil {
-		panic(err)
-	}
-	FilesService = drive.NewFilesService(service)
-
-	sheetService, err := sheets.NewService(ctx, opt)
-	if err != nil {
-		panic(err)
-	}
-	SpreadsheetsService = sheets.NewSpreadsheetsService(sheetService)
+	client := c.Client(context.Background())
+	Service = spreadsheet.NewServiceWithClient(client)
+	Client = &authClient{client}
 
 	logFile := StartLog()
 
