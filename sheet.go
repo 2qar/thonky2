@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
@@ -34,14 +32,10 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 	*s = Sheet{Spreadsheet: &sheet}
 	if _, ferr := os.Open(cacheFilename("modified", sheetID)); ferr == nil {
 		log.Println("loading sheet")
-		var b []byte
-		b, err = loadSheetAttr("modified", sheetID)
+		err = loadSheetAttr(&s.lastModified, "modified", sheetID)
 		if err != nil {
 			return
 		}
-		var t time.Time
-		err = json.Unmarshal(b, &t)
-		s.lastModified = &t
 		updated, err = s.Updated()
 		if err != nil {
 			log.Println("error grabbing s.Updated():", err)
@@ -51,38 +45,20 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 			return
 		}
 
-		b, err = loadSheetAttr("players", sheetID)
+		err = loadSheetAttr(&s.playerCache, "players", sheetID)
 		if err != nil {
 			return
 		}
-		var players []*Player
-		err = json.Unmarshal(b, &players)
-		if err != nil {
-			return
-		}
-		s.playerCache = players
 
-		b, err = loadSheetAttr("week", sheetID)
+		err = loadSheetAttr(&s.weekCache, "week", sheetID)
 		if err != nil {
 			return
 		}
-		var week *Week
-		err = json.Unmarshal(b, &week)
-		if err != nil {
-			return
-		}
-		s.weekCache = week
 
-		b, err = loadSheetAttr("activities", sheetID)
+		err = loadSheetAttr(&s.ValidActivities, "activities", sheetID)
 		if err != nil {
 			return
 		}
-		var activities []string
-		err = json.Unmarshal(b, &activities)
-		if err != nil {
-			return
-		}
-		s.ValidActivities = activities
 
 		log.Println("loaded sheet")
 		return
@@ -91,8 +67,7 @@ func GetSheet(sheetID string, s *Sheet) (updated bool, err error) {
 	if err != nil {
 		return
 	}
-	var activities []string
-	activities, err = sheetValidActivities(sheetID)
+	activities, err := sheetValidActivities(sheetID)
 	if err != nil {
 		return
 	}
@@ -268,8 +243,7 @@ func (s *Sheet) GetWeek() (*Week, error) {
 	week.Days = &days
 
 	startStr := strings.Split(sheet.Rows[1][2].Value, "-")[0]
-	var startTime int
-	startTime, err = strconv.Atoi(startStr)
+	startTime, err := strconv.Atoi(startStr)
 	if err != nil {
 		return &Week{}, err
 	}
@@ -313,30 +287,5 @@ func (s *Sheet) Save() (err error) {
 		return
 	}
 
-	return
-}
-
-// cacheFilename returns a filename based on attr and sheetID
-func cacheFilename(attr, sheetID string) string {
-	return "cache/" + sheetID + "/" + attr + ".json"
-}
-
-func saveSheetAttr(c interface{}, attr, sheetID string) error {
-	log.Printf("saving %s for [%s]\n", attr, sheetID)
-	filename := cacheFilename(attr, sheetID)
-	m, err := json.Marshal(c)
-	if err != nil {
-		return err
-	}
-	err = ioutil.WriteFile(filename, m, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func loadSheetAttr(attr, sheetID string) (b []byte, err error) {
-	log.Printf("loading %s for [%s]\n", attr, sheetID)
-	b, err = ioutil.ReadFile(cacheFilename(attr, sheetID))
 	return
 }
