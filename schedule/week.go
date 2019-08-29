@@ -12,7 +12,7 @@ type Week struct {
 	Date      string
 	Days      [7]string
 	StartTime int
-	container
+	Container
 }
 
 // ActivitiesOn returns the activities for a given day.

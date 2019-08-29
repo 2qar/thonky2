@@ -4,7 +4,7 @@ package schedule
 type Player struct {
 	Name string
 	Role string
-	container
+	Container
 }
 
 // Availability returns the availability of a player for a week.

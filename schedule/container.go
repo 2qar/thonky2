@@ -2,11 +2,11 @@ package schedule
 
 import "github.com/bigheadgeorge/spreadsheet"
 
-// container stores cells in a format that fits each day of the week.
-type container [7][6]*spreadsheet.Cell
+// Container stores cells in a format that fits each activity time every day.
+type Container [7][6]*spreadsheet.Cell
 
 // Values returns the string values of each cell
-func (c *container) Values() [7][6]string {
+func (c *Container) Values() [7][6]string {
 	var values [7][6]string
 	for i, row := range c {
 		for j, cell := range row {
@@ -17,12 +17,12 @@ func (c *container) Values() [7][6]string {
 }
 
 // Fill fills a cell container with cells on a sheet starting at a given row and column.
-func (c *container) Fill(sheet *spreadsheet.Sheet, row, col int) {
+func (c *Container) Fill(sheet *spreadsheet.Sheet, row, col int) {
 	rowMax := row + 7
 	colMax := col + 6
-	for i := row; row < rowMax; row++ {
-		for j := col; col < colMax; col++ {
-			c[i-row][j-col] = &sheet.Rows[i][j]
+	for i := row; i < rowMax; i++ {
+		for j := col; j < colMax; j++ {
+			c[i-2][j-2] = &sheet.Rows[i][j]
 		}
 	}
 }
