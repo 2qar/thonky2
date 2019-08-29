@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/json"
@@ -7,14 +7,9 @@ import (
 	"net/http"
 )
 
-// authClient wraps an authenticated http client to make accessing Google APIs a little easier
-type authClient struct {
-	*http.Client
-}
-
-// GetStruct unmarshals the response from a Google API endpoint into the given interface
-func (a *authClient) GetStruct(s interface{}, url string) error {
-	r, err := a.Get(url)
+// Gets unmarshals the response from a url into the given interface
+func Gets(c *http.Client, s interface{}, url string) error {
+	r, err := c.Get(url)
 	if err != nil {
 		return err
 	} else if r.StatusCode != 200 {

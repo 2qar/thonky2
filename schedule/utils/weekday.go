@@ -1,4 +1,4 @@
-package main
+package utils
 
 // Weekday returns an ISO-8601 compliant weekday, where Monday is the beginning of the week
 func Weekday(day int) int {
@@ -7,4 +7,3 @@ func Weekday(day int) int {
 	}
 	return day - 1
 }
-
