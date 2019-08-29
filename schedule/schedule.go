@@ -11,6 +11,9 @@ import (
 	"github.com/bigheadgeorge/spreadsheet"
 )
 
+// DriveScope is the scope that HTTP clients passed into New() should be authenticated with.
+const DriveScope = "https://www.googleapis.com/auth/drive.metadata.readonly"
+
 // Schedule wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
 // Schedules should be created with New(), or populated with schedule.Update().
 type Schedule struct {
@@ -29,7 +32,7 @@ type Schedule struct {
 func New(service *spreadsheet.Service, client *http.Client, sheetID string) (*Schedule, error) {
 	spreadsheet, err := service.FetchSpreadsheet(sheetID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting spreadsheet: %s", err)
 	}
 	s := &Schedule{Spreadsheet: &spreadsheet, client: client, service: service}
 	err = s.Update()
@@ -49,23 +52,23 @@ func (s *Schedule) Update() error {
 
 	err := s.getPlayers()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting players: %s", err)
 	}
 	err = s.getWeek()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting week: %s", err)
 	}
 	if s.LastModified.Before(s.updatedModified) {
 		s.LastModified = s.updatedModified
 	} else {
 		s.LastModified, err = lastModified(s.client, s.ID)
 		if err != nil {
-			return err
+			return fmt.Errorf("error getting last modified: %s", err)
 		}
 	}
 	s.ValidActivities, err = validActivities(s.client, s.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting valid activities: %s", err)
 	}
 
 	return s.service.ReloadSpreadsheet(s.Spreadsheet)
@@ -121,10 +124,9 @@ func (s *Schedule) getPlayers() error {
 	wg.Wait()
 	close(pCh)
 
-	var players []*Player
+	s.Players = nil
 	for i := 0; i < playerCount; i++ {
-		p := <-pCh
-		players = append(players, &p)
+		s.Players = append(s.Players, <-pCh)
 	}
 	return nil
 }
@@ -136,12 +138,10 @@ func (s *Schedule) getWeek() error {
 		return err
 	}
 
-	date := strings.Split(sheet.Rows[2][1].Value, ", ")[1]
-
-	week := &Week{Date: date}
-	week.Fill(sheet, 2, 2)
+	s.Week.Date = strings.Split(sheet.Rows[2][1].Value, ", ")[1]
+	s.Week.Fill(sheet, 2, 2)
 	for i := 2; i < 9; i++ {
-		week.Days[i-2] = sheet.Rows[i][1].Value
+		s.Week.Days[i-2] = sheet.Rows[i][1].Value
 	}
 
 	startStr := strings.Split(sheet.Rows[1][2].Value, "-")[0]
@@ -149,7 +149,7 @@ func (s *Schedule) getWeek() error {
 	if err != nil {
 		return err
 	}
-	week.StartTime = startTime
+	s.Week.StartTime = startTime
 
 	return err
 }
