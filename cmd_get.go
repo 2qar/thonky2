@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -40,11 +41,11 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		switch args[1] {
 		case "week":
 			log.Println("getting week")
-			if info.Week == nil {
+			if info.Week == (schedule.Week{}) {
 				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
 				return
 			}
-			embed := formatWeek(s, info.Week, info.SheetLink())
+			embed := formatWeek(s, &info.Week, info.SheetLink())
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
@@ -53,14 +54,14 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			log.Println("sent week :)")
 		case "today":
 			log.Println("getting today")
-			if info.Week == nil {
+			if info.Week == (schedule.Week{}) {
 				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
 				return
 			} else if info.Players == nil {
 				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
 				return
 			}
-			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), info.Week.Today())
+			embed := formatDay(s, &info.Week, info.Players, info.SheetLink(), info.Week.Today())
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
@@ -77,7 +78,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				currDay := (i + today) % 7
 				var open string
 				for j, activity := range activities[currDay] {
-					if activity == "Scrim" && info.Week.Cells[currDay][j].Note == "" {
+					if activity == "Scrim" && info.Week.Container[currDay][j].Note == "" {
 						open += ":regional_indicator_o:"
 					} else {
 						open += ":black_large_square:"
@@ -127,7 +128,7 @@ func addTimeField(e *discordgo.MessageEmbed, title string, startTime int) {
 }
 
 // formatWeek formats week information into a Discord embed
-func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.MessageEmbed {
+func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *discordgo.MessageEmbed {
 	embed := baseEmbed("Week of "+w.Date, sheetLink)
 	addTimeField(embed, "Times", w.StartTime)
 	emojiGuild, err := s.Guild("437847669839495168")
@@ -171,7 +172,7 @@ func formatWeek(s *discordgo.Session, w *Week, sheetLink string) *discordgo.Mess
 	return embed
 }
 
-func formatDay(s *discordgo.Session, w *Week, p []*Player, sheetLink string, day int) *discordgo.MessageEmbed {
+func formatDay(s *discordgo.Session, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
 	addTimeField(embed, "Players", w.StartTime)
 

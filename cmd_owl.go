@@ -19,7 +19,7 @@ func init() {
 	AddCommand("owl", "Get info on Overwatch League games", examples, OWL)
 }
 
-type schedule struct {
+type matchSchedule struct {
 	Data struct {
 		Stages []struct {
 			Matches []match
@@ -101,14 +101,14 @@ func nextMatchEmbed(m *match) *discordgo.MessageEmbed {
 }
 
 // getMatches grabs the schedule from the OWL website
-func getMatches() (*schedule, error) {
+func getMatches() (*matchSchedule, error) {
 	r, err := http.Get("https://api.overwatchleague.com/schedule")
 	if err != nil {
 		return nil, err
 	}
 	defer r.Body.Close()
 
-	var s schedule
+	var s matchSchedule
 	err = json.NewDecoder(r.Body).Decode(&s)
 	return &s, err
 }

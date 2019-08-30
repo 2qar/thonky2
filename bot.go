@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 
 	"github.com/bigheadgeorge/spreadsheet"
+	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/oauth2/google"
 )
@@ -20,7 +22,7 @@ var (
 	botUserID string
 
 	// Client is an authenticated http client for accessing Google APIs
-	Client *authClient
+	Client *http.Client
 
 	// Service is the service used to grab spreadsheets
 	Service *spreadsheet.Service
@@ -48,6 +50,19 @@ func main() {
 		panic("no google api key in config.json")
 	}
 
+	b, err = ioutil.ReadFile("service_account.json")
+	if err != nil {
+		panic(err)
+	}
+	c, err := google.JWTConfigFromJSON(b, spreadsheet.Scope, schedule.DriveScope)
+	if err != nil {
+		panic(err)
+	}
+	Client = c.Client(context.Background())
+	Service = spreadsheet.NewServiceWithClient(Client)
+
+	logFile := StartLog()
+
 	d, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		panic(err)
@@ -60,20 +75,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	b, err = ioutil.ReadFile("service_account.json")
-	if err != nil {
-		panic(err)
-	}
-	c, err := google.JWTConfigFromJSON(b, spreadsheet.Scope, "https://www.googleapis.com/auth/drive.metadata.readonly")
-	if err != nil {
-		panic(err)
-	}
-	client := c.Client(context.Background())
-	Service = spreadsheet.NewServiceWithClient(client)
-	Client = &authClient{client}
-
-	logFile := StartLog()
 
 	err = StartReminders(d)
 	if err != nil {
@@ -90,6 +91,7 @@ func main() {
 }
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
+	log.Println("ready")
 	botUserID = r.User.ID
 
 	for _, guild := range r.Guilds {

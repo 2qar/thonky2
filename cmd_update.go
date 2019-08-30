@@ -20,7 +20,7 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	updated, err := info.Sheet.Updated()
+	updated, err := info.Schedule.Updated()
 	if err != nil {
 		log.Println(err)
 		s.ChannelMessageSend(m.ChannelID, "Error checking if the sheet is updated. :(")
@@ -28,16 +28,17 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	} else if updated {
 		s.ChannelMessageSend(m.ChannelID, "Nothing to update.")
 		return
-	} else if info.Updating {
-		s.ChannelMessageSend(m.ChannelID, "Already updating.")
-		return
 	}
 	msg, _ := s.ChannelMessageSend(m.ChannelID, "Updating...")
 
-	err = info.Update(true)
+	err = info.Update()
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageEdit(m.ChannelID, msg.ID, "Error updating. :(")
+		if err.Error() == "already updating" {
+			s.ChannelMessageEdit(m.ChannelID, msg.ID, "Already updating.")
+		} else {
+			log.Println(err)
+			s.ChannelMessageEdit(m.ChannelID, msg.ID, "Error updating. :(")
+		}
 	} else {
 		s.ChannelMessageEdit(m.ChannelID, msg.ID, "Finished updating. :)")
 	}

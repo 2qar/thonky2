@@ -9,6 +9,7 @@ import (
 
 	"github.com/bigheadgeorge/spreadsheet"
 	"github.com/bigheadgeorge/thonky2/db"
+	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 	"github.com/jmoiron/sqlx/types"
 )
@@ -49,12 +50,12 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		if day != -1 {
 			// update w/ day
 			log.Printf("update day %q w/ index %d\n", args[1], day)
-			sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
+			sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
 			if err != nil {
 				log.Println(err)
 				return
 			}
-			err = tryUpdate(sheet, info.Week.Cells[day], info.Week.StartTime, 2, args, info.Sheet.ValidActivities, updateCell)
+			err = tryUpdate(sheet, info.Week.Container[day], info.Week.StartTime, 2, args, info.Schedule.ValidActivities, updateCell)
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, err.Error())
@@ -64,11 +65,11 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			return
 		}
 
-		var player *Player
+		var player *schedule.Player
 		playerName := strings.ToLower(args[1])
 		for _, p := range info.Players {
 			if playerName == strings.ToLower(p.Name) {
-				player = p
+				player = &p
 			}
 		}
 
@@ -77,13 +78,13 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			if day != -1 {
 				// update w/ player
 				log.Printf("update player %q\n", player.Name)
-				sheet, err := info.Sheet.SheetByTitle(player.Name)
+				sheet, err := info.Schedule.SheetByTitle(player.Name)
 				if err != nil {
 					log.Println(err)
 					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing %s's sheet.", player.Name))
 					return
 				}
-				err = tryUpdate(sheet, player.Cells[day], info.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"}, updateCell)
+				err = tryUpdate(sheet, player.Container[day], info.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"}, updateCell)
 				if err != nil {
 					log.Println(err)
 					s.ChannelMessageSend(m.ChannelID, err.Error())
@@ -131,14 +132,14 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
+	sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
 	if err != nil {
 		log.Println(err)
 		s.ChannelMessageSend(m.ChannelID, "Error grabbing week schedule")
 		return
 	}
 
-	var w Week
+	var w schedule.Week
 	err = j.Unmarshal(&w)
 	if err != nil {
 		log.Println(err)
@@ -147,7 +148,7 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 
 	activities := w.Values()
-	for i, c := range info.Week.Cells {
+	for i, c := range info.Week.Container {
 		update(sheet, c[:], activities[i][:], updateCell)
 	}
 	err = sheet.Synchronize()
@@ -175,13 +176,13 @@ func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	if len(args) >= 3 {
 		day := info.Week.DayInt(args[1])
 		if day != -1 {
-			sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
+			sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing week schedule: %s", err))
 				return
 			}
-			err = tryUpdate(sheet, info.Week.Cells[day], info.Week.StartTime, 2, args, []string{}, updateNote)
+			err = tryUpdate(sheet, info.Week.Container[day], info.Week.StartTime, 2, args, []string{}, updateNote)
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error updating notes: %s", err))
