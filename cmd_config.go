@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bwmarrin/discordgo"
 	"github.com/lib/pq"
 )
@@ -80,19 +79,12 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	handler, err := db.NewHandler()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer handler.Close()
-
-	if name, err := handler.GetTeamName(chanID); err == nil {
+	if name, err := DB.GetTeamName(chanID); err == nil {
 		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Channel already occupied by %q", name))
 		return
 	}
 
-	config, err := handler.GetGuild("0")
+	config, err := DB.GetGuild("0")
 	if err != nil {
 		log.Println(err)
 		return
@@ -106,7 +98,7 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 	config.Channels = pq.Int64Array([]int64{channelInt})
-	r, err := handler.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
+	r, err := DB.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
 		log.Println(err)
 		return
@@ -139,19 +131,12 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return
 	}
 
-	handler, err := db.NewHandler()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer handler.Close()
-
 	givenChannels := args[1:]
 	for _, arg := range givenChannels {
 		if !isChannel(arg) {
 			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid channel %q.", arg))
 			return
-		} else if name, err := handler.GetTeamName(channelID(arg)); err == nil {
+		} else if name, err := DB.GetTeamName(channelID(arg)); err == nil {
 			var errMsg string
 			if name == info.TeamName {
 				errMsg = arg + " already added."
@@ -192,7 +177,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		info.Channels = append(info.Channels, i)
 	}
 
-	r, err := handler.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", info.Channels, m.GuildID, info.TeamName)
+	r, err := DB.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", info.Channels, m.GuildID, info.TeamName)
 	defer r.Close()
 	if err != nil {
 		log.Println(err)
@@ -219,14 +204,7 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		return
 	}
 
-	handler, err := db.NewHandler()
-	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error connecting to database, something stupid happened")
-	}
-	defer handler.Close()
-
-	r, err := handler.Query("SELECT id FROM sheet_info WHERE id = $1", info.DocKey)
+	r, err := DB.Query("SELECT id FROM sheet_info WHERE id = $1", info.DocKey)
 	if err != nil {
 		log.Println(err)
 		s.ChannelMessageSend(m.ChannelID, "Error querying database, something stupid happened")
@@ -234,13 +212,13 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	defer r.Close()
 
 	if r.Next() {
-		_, err := handler.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, info.DocKey)
+		_, err := DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, info.DocKey)
 		if err != nil {
 			log.Println(err)
 			s.ChannelMessageSend(m.ChannelID, "Error updating default")
 		}
 	} else {
-		_, err := handler.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", info.DocKey, b)
+		_, err := DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", info.DocKey, b)
 		if err != nil {
 			log.Println(err)
 			s.ChannelMessageSend(m.ChannelID, "Error setting default")

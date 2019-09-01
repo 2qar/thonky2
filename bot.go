@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/bigheadgeorge/spreadsheet"
+	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/oauth2/google"
@@ -20,6 +21,9 @@ import (
 
 var (
 	botUserID string
+
+	// DB is used for accessing the PSQL db
+	DB *db.Handler
 
 	// Client is an authenticated http client for accessing Google APIs
 	Client *http.Client
@@ -49,6 +53,13 @@ func main() {
 	} else if config.GoogleAPIKey == "" {
 		panic("no google api key in config.json")
 	}
+
+	h, err := db.NewHandler()
+	if err != nil {
+		panic(err)
+	}
+	DB = &h
+	defer DB.Close()
 
 	b, err = ioutil.ReadFile("service_account.json")
 	if err != nil {

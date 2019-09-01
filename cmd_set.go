@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/bigheadgeorge/spreadsheet"
-	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 	"github.com/jmoiron/sqlx/types"
@@ -113,15 +112,8 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
 	}
 
-	handler, err := db.NewHandler()
-	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error connecting to database, something stupid happened")
-	}
-	defer handler.Close()
-
 	var j types.JSONText
-	err = handler.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", info.DocKey)
+	err = DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", info.DocKey)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			s.ChannelMessageSend(m.ChannelID, "No default week schedule for this sheet")

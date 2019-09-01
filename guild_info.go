@@ -98,13 +98,7 @@ func GetInfo(guildID, channelID string) (*TeamInfo, error) {
 
 // NewGuildInfo returns info about a guild, including info about each of the teams in that guild.
 func NewGuildInfo(guildID string) (g *GuildInfo, err error) {
-	handler, err := db.NewHandler()
-	if err != nil {
-		return
-	}
-	defer handler.Close()
-
-	config, err := handler.GetGuild(guildID)
+	config, err := DB.GetGuild(guildID)
 	if err != nil {
 		return
 	}
@@ -114,7 +108,7 @@ func NewGuildInfo(guildID string) (g *GuildInfo, err error) {
 		return nil, err
 	}
 	g = &GuildInfo{TeamInfo: guildTeam}
-	teams, err := handler.GetTeams(guildID)
+	teams, err := DB.GetTeams(guildID)
 	if err != nil {
 		return
 	}
