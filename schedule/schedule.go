@@ -84,6 +84,16 @@ func (s *Schedule) Updated() (bool, error) {
 	return s.updatedModified.Before(s.LastModified) || s.updatedModified.Equal(s.LastModified), nil
 }
 
+// SyncSheet pushes all of the changes on a sheet and updates the modified time.
+func (s *Schedule) SyncSheet(sheet *spreadsheet.Sheet) (err error) {
+	err = s.service.SyncSheet(sheet)
+	if err != nil {
+		return
+	}
+	s.LastModified = time.Now().UTC()
+	return
+}
+
 // getPlayers returns all of the players on a sheet.
 func (s *Schedule) getPlayers() error {
 	sheet, err := s.SheetByTitle("Team Availability")

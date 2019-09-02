@@ -58,6 +58,13 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, err.Error())
+				return
+			}
+			err = info.Schedule.SyncSheet(sheet)
+			if err != nil {
+				log.Println(err)
+				s.ChannelMessageSend(m.ChannelID, err.Error())
+				return
 			}
 
 			s.ChannelMessageSend(m.ChannelID, "Updated week schedule.")
@@ -87,6 +94,13 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				if err != nil {
 					log.Println(err)
 					s.ChannelMessageSend(m.ChannelID, err.Error())
+					return
+				}
+				err = info.Schedule.SyncSheet(sheet)
+				if err != nil {
+					log.Println(err)
+					s.ChannelMessageSend(m.ChannelID, err.Error())
+					return
 				}
 
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Updated %s's schedule.", player.Name))
@@ -143,7 +157,7 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	for i, c := range info.Week.Container {
 		update(sheet, c[:], activities[i][:], updateCell)
 	}
-	err = sheet.Synchronize()
+	err = info.Schedule.SyncSheet(sheet)
 	if err != nil {
 		log.Println(err)
 		s.ChannelMessageSend(m.ChannelID, "Error synchronizing sheets")
@@ -175,6 +189,12 @@ func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				return
 			}
 			err = tryUpdate(sheet, info.Week.Container[day], info.Week.StartTime, 2, args, []string{}, updateNote)
+			if err != nil {
+				log.Println(err)
+				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error updating notes: %s", err))
+				return
+			}
+			err = info.Schedule.SyncSheet(sheet)
 			if err != nil {
 				log.Println(err)
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error updating notes: %s", err))
@@ -221,53 +241,52 @@ func updateNote(sheet *spreadsheet.Sheet, cell *spreadsheet.Cell, val string) {
 }
 
 func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, startTime, valueStart int, args, validArgs []string, updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)) error {
+	var updateCells []*spreadsheet.Cell
+	var parsed []string
+	var err error
 	if match, _ := regexp.MatchString(`\d{1,2}-\d{1,2}`, args[valueStart]); match {
 		rangeStart, rangeEnd, err := getTimeRange(args[valueStart], startTime)
 		if err != nil {
 			return err
 		}
-		var updateCells []*spreadsheet.Cell
 		if rangeStart == rangeEnd {
 			updateCells = []*spreadsheet.Cell{cells[rangeStart]}
 		} else {
 			updateCells = cells[rangeStart:rangeEnd]
 		}
 
-		parsed, err := parseArgs(args[valueStart+1:], validArgs)
+		parsed, err = parseArgs(args[valueStart+1:], validArgs)
 		if err != nil {
 			return err
 		} else if len(updateCells) != len(parsed) && len(parsed) != 1 {
 			return fmt.Errorf("Invalid amount of activities for this range: %d cells =/= %d responses", len(updateCells), len(parsed))
 		}
-
-		update(sheet, updateCells, parsed, updater)
 	} else if i, err := strconv.Atoi(args[valueStart]); err == nil {
 		if i < startTime {
 			return fmt.Errorf("Invalid time: %d < %d", i, startTime)
 		}
-		parsed, err := parseArgs(args[valueStart+1:], validArgs)
+		parsed, err = parseArgs(args[valueStart+1:], validArgs)
 		if err != nil {
 			return err
 		} else if len(parsed) != 1 {
 			return fmt.Errorf("Too many arguments: %d != 1", len(parsed))
 		}
 
-		update(sheet, []*spreadsheet.Cell{cells[i-4]}, parsed, updater)
+		updateCells[0] = cells[i-4]
 	} else {
-		parsed, err := parseArgs(args[valueStart:], validArgs)
+		parsed, err = parseArgs(args[valueStart:], validArgs)
 		if err != nil {
 			return err
 		} else if len(parsed) != 1 {
 			return fmt.Errorf("Too many arguments: %d =/= 1", len(parsed))
 		}
 
-		var updateCells []*spreadsheet.Cell
 		for _, cell := range cells {
 			updateCells = append(updateCells, cell)
 		}
-		update(sheet, updateCells, parsed, updater)
 	}
-	return sheet.Synchronize()
+	update(sheet, updateCells, parsed, updater)
+	return err
 }
 
 func getTimeRange(timeStr string, startTime int) (int, int, error) {
