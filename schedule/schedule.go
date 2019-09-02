@@ -28,14 +28,14 @@ type Schedule struct {
 	*spreadsheet.Spreadsheet
 }
 
-// New returns a new Schedule with all of its fields populated.
+// New returns a new Schedule with its last modified time populated.
 func New(service *spreadsheet.Service, client *http.Client, sheetID string) (*Schedule, error) {
 	spreadsheet, err := service.FetchSpreadsheet(sheetID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting spreadsheet: %s", err)
 	}
 	s := &Schedule{Spreadsheet: &spreadsheet, client: client, service: service}
-	err = s.Update()
+	s.LastModified, err = lastModified(client, spreadsheet.ID)
 	return s, err
 }
 

@@ -163,6 +163,12 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		s.ChannelMessageSend(m.ChannelID, "Error synchronizing sheets")
 		return
 	}
+	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", info.Schedule.ID), info.Schedule.Week)
+	if err != nil {
+		log.Println(err)
+		s.ChannelMessageSend(m.ChannelID, "Error caching new default week")
+		return
+	}
 
 	s.ChannelMessageSend(m.ChannelID, "Loaded default week schedule. :)")
 }

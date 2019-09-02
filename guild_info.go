@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"strconv"
@@ -55,6 +56,36 @@ func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
 		if err != nil {
 			return teamInfo, err
 		}
+
+		var t time.Time
+		err = DB.Get(&t, "SELECT modified FROM cache WHERE id = $1", schedule.ID)
+		var update bool
+		if err != nil {
+			if err == sql.ErrNoRows {
+				update = true
+			} else {
+				return teamInfo, err
+			}
+		} else {
+			if schedule.LastModified.After(t) {
+				update = true
+			} else {
+				err = DB.Get(schedule, "SELECT * FROM cache WHERE id = $1", schedule.ID)
+			}
+		}
+
+		if update {
+			err = schedule.Update()
+			if err != nil {
+				return teamInfo, err
+			}
+
+			err = DB.CacheSchedule(schedule)
+			if err != nil {
+				return teamInfo, err
+			}
+		}
+
 		teamInfo.Schedule = schedule
 		schedulePool[config.DocKey.String] = schedule
 	} else {
@@ -69,6 +100,10 @@ func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
 				log.Println(err)
 			} else if !updated {
 				err = t.Update()
+				if err != nil {
+					log.Println(err)
+				}
+				err = DB.CacheSchedule(t.Schedule)
 				if err != nil {
 					log.Println(err)
 				}
