@@ -8,7 +8,8 @@ var Commands = make(map[string]*Command)
 
 // cmd is the template for any command.
 // Any command should take a session, the message, and a slice of arguments.
-type cmd func(*discord.Session, *discord.MessageCreate, []string)
+// The string returned will be sent in Discord.
+type cmd func(*discord.Session, *discord.MessageCreate, []string) (string, error)
 
 // Command is a struct holding info about a command and the command itself
 type Command struct {

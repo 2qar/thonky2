@@ -8,7 +8,7 @@ func init() {
 	AddCommand("help", "duh", [][2]string{{"!help", "yeah"}}, help)
 }
 
-func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	if len(args) > 2 {
 		s.ChannelMessageSend(m.ChannelID, "what the heck are you doing")
 	} else if len(args) == 2 {
@@ -31,4 +31,5 @@ func help(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		cmdList += "```"
 		s.ChannelMessageSend(m.ChannelID, cmdList)
 	}
+	return "", nil
 }

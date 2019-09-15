@@ -26,14 +26,10 @@ func logEmbed(e *discordgo.MessageEmbed) {
 }
 
 // Get formats information from a given spreadsheet into a Discord embed.
-func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
-		return
-	} else if !info.DocKey.Valid {
-		s.ChannelMessageSend(m.ChannelID, "No doc key for this guild.")
-		return
+	if err != nil || !info.DocKey.Valid {
+		return "No config for this guild.", nil
 	}
 
 	if len(args) == 2 {
@@ -41,24 +37,21 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		case "week":
 			log.Println("getting week")
 			if info.Week == nil {
-				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
-				return
+				return "No week schedule, something broke", nil
 			}
 			embed := formatWeek(s, info.Week, info.SheetLink())
 			logEmbed(embed)
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, err.Error())
+				return err.Error(), err
 			}
 			log.Println("sent week :)")
 		case "today":
 			log.Println("getting today")
 			if info.Week == nil {
-				s.ChannelMessageSend(m.ChannelID, "No week schedule, something broke")
-				return
+				return "No week schedule, something broke", nil
 			} else if info.Players == nil {
-				s.ChannelMessageSend(m.ChannelID, "No players, something broke")
-				return
+				return "No players, something broke", nil
 			}
 			embed := formatDay(s, info.Week, info.Players, info.SheetLink(), info.Week.Today())
 			logEmbed(embed)
@@ -91,11 +84,11 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 
 			_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
-				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error sending embed: %s", err))
+				return "Error sending embed: " + err.Error(), err
 			}
 		}
 	}
+	return "", nil
 }
 
 // baseEmbed returns a template embed with the decorative stuff set up all ez

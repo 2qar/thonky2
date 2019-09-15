@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"regexp"
@@ -34,14 +35,12 @@ func init() {
 }
 
 // Set is used for updating info on a Spreadsheet
-func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
-		return
+		return "No config for this guild.", nil
 	} else if !info.DocKey.Valid {
-		s.ChannelMessageSend(m.ChannelID, "No doc key for this guild.")
-		return
+		return "No doc key for this guild.", nil
 	}
 
 	if len(args) >= 3 {
@@ -51,17 +50,14 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			log.Printf("update day %q w/ index %d\n", args[1], day)
 			sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
 			if err != nil {
-				log.Println(err)
-				return
+				return err.Error(), err
 			}
 			err = tryUpdate(sheet, info.Week.Cells[day], info.Week.StartTime, 2, args, info.Sheet.ValidActivities, updateCell)
 			if err != nil {
-				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, err.Error())
+				return err.Error(), err
 			}
 
-			s.ChannelMessageSend(m.ChannelID, "Updated week schedule.")
-			return
+			return "Updated week schedule.", nil
 		}
 
 		var player *Player
@@ -79,71 +75,57 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 				log.Printf("update player %q\n", player.Name)
 				sheet, err := info.Sheet.SheetByTitle(player.Name)
 				if err != nil {
-					log.Println(err)
-					s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing %s's sheet.", player.Name))
-					return
+					return fmt.Sprintf("Error grabbing %s's sheet.", player.Name), err
 				}
 				err = tryUpdate(sheet, player.Cells[day], info.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"}, updateCell)
 				if err != nil {
-					log.Println(err)
-					s.ChannelMessageSend(m.ChannelID, err.Error())
+					return err.Error(), err
 				}
 
-				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Updated %s's schedule.", player.Name))
-				return
+				return fmt.Sprintf("Updated %s's schedule.", player.Name), nil
 			}
 
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid day %q", args[2]))
-			return
+			return fmt.Sprintf("Invalid day %q", args[2]), nil
 		}
 
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid day / player %q", args[1]))
-		return
+		return fmt.Sprintf("Invalid day / player %q", args[1]), nil
 	}
 
-	s.ChannelMessageSend(m.ChannelID, "weird amount of args")
+	return "weird amount of args", nil
 }
 
 // Reset loads the default week schedule for a sheet
-func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
+		return "Error grabbing info", err
 	}
 
 	handler, err := db.NewHandler()
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error connecting to database, something stupid happened")
+		return "Error connecting to database, something stupid happened", err
 	}
 	defer handler.Close()
 
 	var j types.JSONText
 	err = handler.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", info.DocKey)
 	if err != nil {
-		if err.Error() == "sql: no rows in result set" {
-			s.ChannelMessageSend(m.ChannelID, "No default week schedule for this sheet")
+		if err == sql.ErrNoRows {
+			return "No default week schedule for this sheet", nil
 		} else {
-			log.Println(err)
-			s.ChannelMessageSend(m.ChannelID, "Error loading default week schedule")
+			return "Error loading default week schedule", err
 		}
-		return
 	}
 
 	sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing week schedule")
-		return
+		return "Error grabbing week schedule", err
 	}
 
 	var w Week
 	err = j.Unmarshal(&w)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error parsing default week schedule, something stupid happened")
-		return
+		return "Error parsing default week schedule, something stupid happened", err
 	}
 
 	activities := w.Values()
@@ -152,24 +134,19 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	}
 	err = sheet.Synchronize()
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error synchronizing sheets")
-		return
+		return "Error synchronizing sheets", err
 	}
 
-	s.ChannelMessageSend(m.ChannelID, "Loaded default week schedule. :)")
+	return "Loaded default week schedule. :)", nil
 }
 
 // Schedule updates notes on the week schedule, used for scheduling Scrims and stuff like that
-func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
-		return
+		return "Error grabbing info", err
 	} else if !info.DocKey.Valid {
-		s.ChannelMessageSend(m.ChannelID, "No doc key for this guild.")
-		return
+		return "No doc key for this guild.", nil
 	}
 
 	if len(args) >= 3 {
@@ -177,23 +154,19 @@ func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		if day != -1 {
 			sheet, err := info.Sheet.SheetByTitle("Weekly Schedule")
 			if err != nil {
-				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error grabbing week schedule: %s", err))
-				return
+				return fmt.Sprintf("Error grabbing week schedule: %s", err), err
 			}
 			err = tryUpdate(sheet, info.Week.Cells[day], info.Week.StartTime, 2, args, []string{}, updateNote)
 			if err != nil {
-				log.Println(err)
-				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Error updating notes: %s", err))
-				return
+				return fmt.Sprintf("Error updating notes: %s", err), err
 			}
 
-			s.ChannelMessageSend(m.ChannelID, "Updated scrim schedule.")
+			return "Updated scrim schedule.", nil
 		} else {
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid day %q.", args[1]))
+			return fmt.Sprintf("Invalid day %q.", args[1]), nil
 		}
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "weird amount of args")
+		return "weird amount of args", nil
 	}
 }
 
