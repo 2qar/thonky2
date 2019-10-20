@@ -79,7 +79,7 @@ func (d *Handler) CacheSchedule(s *schedule.Schedule) (err error) {
 	var query string
 	update := r.Next()
 	if update {
-		query = "UPDATE cache SET modified = $1, players = $2, week = $3, activities = $4"
+		query = "UPDATE cache SET modified = $1, players = $2, week = $3, activities = $4 WHERE id = $5"
 	} else {
 		query = "INSERT INTO cache(id, modified, players, week, activities) VALUES($1, $2, $3, $4, $5)"
 	}
@@ -96,7 +96,7 @@ func (d *Handler) CacheSchedule(s *schedule.Schedule) (err error) {
 	activities := pq.StringArray(s.ValidActivities)
 
 	if update {
-		_, err = d.Exec(query, s.LastModified, b[0], b[1], activities)
+		_, err = d.Exec(query, s.LastModified, b[0], b[1], activities, s.ID)
 	} else {
 		_, err = d.Exec(query, s.ID, s.LastModified, b[0], b[1], activities)
 	}
