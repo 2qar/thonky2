@@ -70,7 +70,11 @@ func getTeamInfo(config *db.TeamConfig) (*TeamInfo, error) {
 			if schedule.LastModified.After(t) {
 				update = true
 			} else {
-				err = DB.Get(schedule, "SELECT * FROM cache WHERE id = $1", schedule.ID)
+				log.Println("grab from cache")
+				err = DB.CachedSchedule(schedule)
+				if err != nil {
+					return teamInfo, err
+				}
 			}
 		}
 

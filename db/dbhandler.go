@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 
 	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/jmoiron/sqlx"
@@ -100,5 +101,28 @@ func (d *Handler) CacheSchedule(s *schedule.Schedule) (err error) {
 	} else {
 		_, err = d.Exec(query, s.ID, s.LastModified, b[0], b[1], activities)
 	}
+	return
+}
+
+// CachedSchedule returns a cached schedule
+func (d *Handler) CachedSchedule(s *schedule.Schedule) (err error) {
+	var data [3][]byte
+	r := d.QueryRow("SELECT players, week, activities FROM cache WHERE id = $1", s.ID)
+	err = r.Scan(&data[0], &data[1], &data[2])
+	if err != nil {
+		return
+	}
+	for i, v := range []interface{}{&s.Players, &s.Week} {
+		err = json.Unmarshal(data[i], v)
+		if err != nil {
+			return
+		}
+	}
+	activities := string(data[2])
+	// TODO: replace this with something a little less hacky
+	for _, p := range []string{"{", "}", "\""} {
+		activities = strings.ReplaceAll(activities, p, "")
+	}
+	s.ValidActivities = strings.Split(activities, ",")
 	return
 }
