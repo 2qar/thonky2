@@ -35,6 +35,10 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
+	err = schedule.Update()
+	if err != nil {
+		panic(err)
+	}
 
 	os.Exit(m.Run())
 }

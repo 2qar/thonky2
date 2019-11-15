@@ -15,7 +15,7 @@ import (
 const DriveScope = "https://www.googleapis.com/auth/drive.metadata.readonly"
 
 // Schedule wraps spreadsheet.Spreadsheet with more metadata like the last modified time etc.
-// Schedules should be created with New(), or populated with schedule.Update().
+// Schedules should be created with New() and populated with schedule.Update().
 type Schedule struct {
 	Week            Week
 	ValidActivities []string
