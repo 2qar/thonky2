@@ -205,25 +205,21 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (stri
 }
 
 // SetTournament sets the battlefy tournament for the current team
-func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
-		return
+		return "Error grabbing info", nil
 	}
 
 	if len(args) > 2 {
-		s.ChannelMessageSend(m.ChannelID, "Too many arguments")
-		return
+		return "Too many arguments", nil
 	} else if len(args) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "No URL given")
-		return
+		return "No URL given.", nil
 	}
 
 	url := regexp.MustCompile(`https://battlefy.com/[\w\d-]{1,}/[\w\d-]{1,}/[\d\w]{24}/stage/[\d\w]{24}`).FindString(args[1])
 	if url == "" {
-		s.ChannelMessageSend(m.ChannelID, "Invalid tournament URL")
-		return
+		return "Invalid tournament URL", nil
 	}
 
 	// TODO: merge "server_config" and "teams" table so i don't have to do this shit
@@ -233,8 +229,7 @@ func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		_, err = DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], info.GuildID, info.TeamName)
 	}
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "Error updating tournament url: "+err.Error())
-		return
+		return "Error updating tournament url: " + err.Error(), err
 	}
-	s.ChannelMessageSend(m.ChannelID, "Updated tournament URL. :)")
+	return "Updated tournament URL. :)", nil
 }
