@@ -6,6 +6,7 @@ import (
 	"log"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/lib/pq"
@@ -27,6 +28,11 @@ func init() {
 		{"!save", "Save the current week schedule as default"},
 	}
 	AddCommand("save", "Save the week schedule", examples, Save)
+
+	examples = [][2]string{
+		{"!set_tournament https://battlefy.com/overwatch-open-division-north-america/2019-overwatch-open-division-practice-season-north-america/5d6fdb02c747ff732da36eb4/stage/5d7b716bb7758c268b771f83/bracket/1", "Update the current tournament"},
+	}
+	AddCommand("set_tournament", "Update the current tournament", examples, SetTournament).AddAliases("set_tourney")
 }
 
 func isChannel(s string) bool {
@@ -225,4 +231,39 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}
 	}
 	s.ChannelMessageSend(m.ChannelID, "Updated default week schedule. :)")
+}
+
+// SetTournament sets the battlefy tournament for the current team
+func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+	info, err := GetInfo(m.GuildID, m.ChannelID)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
+		return
+	}
+
+	if len(args) > 2 {
+		s.ChannelMessageSend(m.ChannelID, "Too many arguments")
+		return
+	} else if len(args) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "No URL given")
+		return
+	}
+
+	url := regexp.MustCompile(`https://battlefy.com/[\w\d-]{1,}/[\w\d-]{1,}/[\d\w]{24}/stage/[\d\w]{24}`).FindString(args[1])
+	if url == "" {
+		s.ChannelMessageSend(m.ChannelID, "Invalid tournament URL")
+		return
+	}
+
+	// TODO: merge "server_config" and "teams" table so i don't have to do this shit
+	if info.TeamName == "" {
+		_, err = DB.Exec("UPDATE server_config SET tournament_link = $1 WHERE server_id = $2", url, info.GuildID)
+	} else {
+		_, err = DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], info.GuildID, info.TeamName)
+	}
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error updating tournament url: "+err.Error())
+		return
+	}
+	s.ChannelMessageSend(m.ChannelID, "Updated tournament URL. :)")
 }
