@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/bigheadgeorge/odscraper"
 	"github.com/bwmarrin/discordgo"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -22,24 +21,21 @@ func init() {
 }
 
 // OD grabs information about another team
-func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
-		return
+		return "No config for this guild.", nil
 	}
 
 	if len(m.Content) < 5 {
-		s.ChannelMessageSend(m.ChannelID, "No team!")
-		return
+		return "No team!", nil
 	}
 
 	name := m.Content[4:]
 	num, err := strconv.Atoi(name)
 	if err != nil {
 		if !info.TournamentLink.Valid {
-			s.ChannelMessageSend(m.ChannelID, "No tournament link for this team.")
-			return
+			return "No tournament link for this team.", nil
 		}
 
 		tournamentID := strings.Split(info.TournamentLink.String, "/")[5]
@@ -49,8 +45,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 			if strings.HasPrefix(err.Error(), "unable to find team") {
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Unable to find team \"%s\"", name))
 			} else {
-				log.Println(err)
-				return
+				return err.Error(), err
 			}
 		}
 		if len(names) > 1 {
@@ -70,21 +65,18 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}
 	} else {
 		if !info.TeamID.Valid {
-			s.ChannelMessageSend(m.ChannelID, "No team ID for this team.")
-			return
+			return "No team ID for this team.", nil
 		} else if !info.TournamentLink.Valid {
-			s.ChannelMessageSend(m.ChannelID, "No tournament link for this team.")
-			return
+			return "No tournament link for this team.", nil
 		}
 		t, err := odscraper.GetOtherTeam(info.TournamentLink.String, info.TeamID.String, num)
 		if err != nil {
-			log.Println(err)
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("No data for round %d. :(", num))
-			return
+			return fmt.Sprintf("No data for round %d. :(", num), err
 		}
 		embed := formatTeamInfo(&t)
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
+	return "", nil
 }
 
 func sortPlayers(a []odscraper.PlayerInfo, n int) {

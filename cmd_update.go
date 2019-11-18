@@ -10,24 +10,19 @@ func init() {
 }
 
 // Update updates the sheet locally
-func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
-		return
+		return "No config for this guild.", nil
 	} else if !info.DocKey.Valid {
-		s.ChannelMessageSend(m.ChannelID, "No doc key for this guild.")
-		return
+		return "No doc key for this guild.", nil
 	}
 
 	updated, err := info.Schedule.Updated()
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error checking if the sheet is updated. :(")
-		return
+		return "Error checking if the sheet is updated. :(", err
 	} else if updated {
-		s.ChannelMessageSend(m.ChannelID, "Nothing to update.")
-		return
+		return "Nothing to update.", nil
 	}
 	msg, _ := s.ChannelMessageSend(m.ChannelID, "Updating...")
 
@@ -42,4 +37,5 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 	} else {
 		s.ChannelMessageEdit(m.ChannelID, msg.ID, "Finished updating. :)")
 	}
+	return "", nil
 }

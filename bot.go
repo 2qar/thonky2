@@ -125,7 +125,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		args := strings.Split(m.Content, " ")
 		for name, command := range Commands {
 			if string(args[0][1:]) == name {
-				command.Call(s, m, args)
+				msg, err := command.Call(s, m, args)
+				if err != nil {
+					log.Println(err)
+				}
+				if msg != "" {
+					s.ChannelMessageSend(m.ChannelID, msg)
+				}
 			}
 		}
 	}

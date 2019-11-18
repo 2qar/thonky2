@@ -49,109 +49,90 @@ func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
 }
 
 // AddTeam adds a team to a guild
-func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info := guildInfo[m.GuildID]
 	if info == nil {
-		log.Printf("no info for [%s]\n", m.GuildID)
-		s.ChannelMessageSend(m.GuildID, "No info for this guild.")
-		return
+		return "No info for this guild.", fmt.Errorf("no info for [%s]\n", m.GuildID)
 	}
 
 	if len(args) != 3 {
 		if len(args) == 2 {
-			s.ChannelMessageSend(m.ChannelID, "Bad amount of args; no channel given!")
+			return "Bad amount of args; no channel given!", nil
 		} else {
-			s.ChannelMessageSend(m.ChannelID, "Bad amount of args.")
+			return "Bad amount of args.", nil
 		}
-		return
 	}
 	if !isChannel(args[2]) {
-		s.ChannelMessageSend(m.ChannelID, "Invalid channel.")
-		return
+		return "Invalid channel", nil
 	}
 	chanID := channelID(args[2])
 	canSend, err := sendPermission(s, chanID)
 	if err != nil {
-		log.Println(err)
-		return
+		return err.Error(), err
 	} else if !canSend {
-		s.ChannelMessageSend(m.ChannelID, "I don't have permission to send messages in that channel. :(")
-		return
+		return "I don't have permission to send messages in that channel. :(", nil
 	}
 
 	if name, err := DB.GetTeamName(chanID); err == nil {
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Channel already occupied by %q", name))
-		return
+		return fmt.Sprintf("Channel already occupied by %q", name), nil
 	}
 
 	config, err := DB.GetGuild("0")
 	if err != nil {
-		log.Println(err)
-		return
+		return err.Error(), err
 	}
 	config.GuildID = m.GuildID
 	config.TeamName = args[1]
 	channelInt, err := strconv.ParseInt(chanID, 10, 64)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error adding team, something stupid happened")
-		return
+		return "Error adding team, something stupid happened", err
 	}
 	config.Channels = pq.Int64Array([]int64{channelInt})
 	r, err := DB.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
 	if err != nil {
-		log.Println(err)
-		return
+		return err.Error(), err
 	}
 	defer r.Close()
 
 	err = info.AddTeam(config)
 	if err != nil {
-		log.Println(err)
+		return "Error adding team: " + err.Error(), err
 	}
-	s.ChannelMessageSend(m.ChannelID, "Added team.")
 	log.Printf("added team %q to guild [%s]\n", args[1], m.GuildID)
+	return "Added team.", nil
 }
 
 // AddChannels adds channels to the team in the channel the command is called from
-func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	if len(args) < 2 {
-		s.ChannelMessageSend(m.ChannelID, "No channels given!")
-		return
+		return "No channels given!", nil
 	}
 
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		s.ChannelMessageSend(m.ChannelID, "No config for this guild.")
-		return
+		return "No config for this guild.", nil
 	}
 
 	if info.TeamName == "" {
-		s.ChannelMessageSend(m.ChannelID, "No team in this channel.")
-		return
+		return "No team in this channel.", nil
 	}
 
 	givenChannels := args[1:]
 	for _, arg := range givenChannels {
 		if !isChannel(arg) {
-			s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid channel %q.", arg))
-			return
+			return fmt.Sprintf("Invalid channel %q.", arg), nil
 		} else if name, err := DB.GetTeamName(channelID(arg)); err == nil {
-			var errMsg string
 			if name == info.TeamName {
-				errMsg = arg + " already added."
+				return arg + " already added.", nil
 			} else {
-				errMsg = fmt.Sprintf("%s already occupied by %q.", arg, name)
+				return fmt.Sprintf("%s already occupied by %q.", arg, name), nil
 			}
-			s.ChannelMessageSend(m.ChannelID, errMsg)
-			return
 		}
 		canSend, err := sendPermission(s, arg[2:len(arg)-1])
 		if err != nil {
 			log.Println(err)
 		} else if !canSend {
-			s.ChannelMessageSend(m.ChannelID, "I don't have permission to send messages in that channel. :(")
-			return
+			return "I don't have permission to send messages in that channel. :(", nil
 		}
 	}
 
@@ -170,9 +151,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	for _, id := range givenChannels {
 		i, err := strconv.ParseInt(id, 10, 64)
 		if err != nil {
-			log.Println(err)
-			s.ChannelMessageSend(m.ChannelID, "Error updating channels.")
-			return
+			return "Error updating channels.", err
 		}
 		info.Channels = append(info.Channels, i)
 	}
@@ -180,49 +159,41 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	r, err := DB.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", info.Channels, m.GuildID, info.TeamName)
 	defer r.Close()
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error updating channels.")
-		return
+		return "Error updating channels.", err
 	}
 
-	s.ChannelMessageSend(m.ChannelID, "Added channels.")
+	return "Added Channels.", nil
 }
 
 // Save saves a sheet's current week schedule for resetting to
-func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	info, err := GetInfo(m.GuildID, m.ChannelID)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error grabbing info")
+		return "Error grabbing info: " + err.Error(), err
 	}
 
 	var b []byte
 	b, err = json.Marshal(info.Week)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error encoding schedule, something stupid happened")
-		return
+		return "Error encoding schedule, something stupid happened", err
 	}
 
 	r, err := DB.Query("SELECT id FROM sheet_info WHERE id = $1", info.DocKey)
 	if err != nil {
-		log.Println(err)
-		s.ChannelMessageSend(m.ChannelID, "Error querying database, something stupid happened")
+		return "Error querying database, something stupid happened", nil
 	}
 	defer r.Close()
 
 	if r.Next() {
 		_, err := DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, info.DocKey)
 		if err != nil {
-			log.Println(err)
-			s.ChannelMessageSend(m.ChannelID, "Error updating default")
+			return "Error updating default", err
 		}
 	} else {
 		_, err := DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", info.DocKey, b)
 		if err != nil {
-			log.Println(err)
-			s.ChannelMessageSend(m.ChannelID, "Error setting default")
+			return "Error setting default", err
 		}
 	}
-	s.ChannelMessageSend(m.ChannelID, "Updated default week schedule. :)")
+	return "Updated default week schedule. :)", nil
 }

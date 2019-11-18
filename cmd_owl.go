@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -114,19 +113,16 @@ func getMatches() (*matchSchedule, error) {
 }
 
 // OWL posts information about Overwatch League games
-func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
+func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	if len(args) == 1 || len(args) > 2 {
-		s.ChannelMessageSend(m.ChannelID, "Weird number of args")
-		return
+		return "Weird number of args", nil
 	}
 
 	switch strings.ToLower(args[1]) {
 	case "today":
 		sched, err := getMatches()
 		if err != nil {
-			log.Println("err:", err)
-			s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
-			return
+			return "Error grabbing OWL schedule.", err
 		}
 		var matches []match
 		now := time.Now()
@@ -163,35 +159,31 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 					}
 
 					s.ChannelMessageSendEmbed(m.ChannelID, embed)
-					return
+					return "", nil
 				}
 			}
 		}
 
-		s.ChannelMessageSend(m.ChannelID, "No games today.")
+		return "No games today.", nil
 	case "next":
 		sched, err := getMatches()
 		if err != nil {
-			log.Println("err:", err)
-			s.ChannelMessageSend(m.ChannelID, "Error grabbing OWL schedule.")
-			return
+			return "Error grabbing OWL schedule.", err
 		}
 		for _, stage := range sched.Data.Stages {
 			for _, match := range stage.Matches {
 				if match.Status == "PENDING" {
 					s.ChannelMessageSendEmbed(m.ChannelID, nextMatchEmbed(&match))
-					return
+					return "", nil
 				}
 			}
 		}
 
-		s.ChannelMessageSend(m.ChannelID, "No games left. :(")
+		return "No games left. :(", nil
 	case "now":
 		r, err := http.Get("https://api.overwatchleague.com/live-match")
 		if err != nil {
-			log.Println("err:", err)
-			s.ChannelMessageSend(m.ChannelID, "Error grabbing live match.")
-			return
+			return "Error grabbing live match.", err
 		}
 		defer r.Body.Close()
 
@@ -202,9 +194,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 		}{}
 		err = json.NewDecoder(r.Body).Decode(&live)
 		if err != nil {
-			log.Println("err parsing live match:", err)
-			s.ChannelMessageSend(m.ChannelID, "Error parsing live match info.")
-			return
+			return "Error parsing live match info.", err
 		}
 		match := &live.Data.LiveMatch
 
@@ -226,6 +216,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) {
 
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	default:
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Invalid option %q.", args[1]))
+		return fmt.Sprintf("Invalid option %q.", args[1]), nil
 	}
+	return "", nil
 }
