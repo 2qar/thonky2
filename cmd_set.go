@@ -36,27 +36,28 @@ func init() {
 
 // Set is used for updating info on a Spreadsheet
 func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
 		return "No config for this guild.", nil
-	} else if !info.DocKey.Valid {
+	} else if !team.DocKey.Valid {
 		return "No doc key for this guild.", nil
 	}
+	sched := team.Schedule()
 
 	if len(args) >= 3 {
-		day := info.Week.DayInt(args[1])
+		day := sched.Week.DayInt(args[1])
 		if day != -1 {
 			// update w/ day
 			log.Printf("update day %q w/ index %d\n", args[1], day)
-			sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
+			sheet, err := sched.SheetByTitle("Weekly Schedule")
 			if err != nil {
 				return err.Error(), err
 			}
-			err = tryUpdate(sheet, info.Week.Container[day], info.Week.StartTime, 2, args, info.Schedule.ValidActivities, updateCell)
+			err = tryUpdate(sheet, sched.Week.Container[day], sched.Week.StartTime, 2, args, sched.ValidActivities, updateCell)
 			if err != nil {
 				return err.Error(), err
 			}
-			err = info.Schedule.SyncSheet(sheet)
+			err = sched.SyncSheet(sheet)
 			if err != nil {
 				return err.Error(), err
 			}
@@ -66,26 +67,26 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 
 		var player *schedule.Player
 		playerName := strings.ToLower(args[1])
-		for _, p := range info.Players {
+		for _, p := range sched.Players {
 			if playerName == strings.ToLower(p.Name) {
 				player = &p
 			}
 		}
 
 		if player != nil {
-			day = info.Week.DayInt(args[2])
+			day = sched.Week.DayInt(args[2])
 			if day != -1 {
 				// update w/ player
 				log.Printf("update player %q\n", player.Name)
-				sheet, err := info.Schedule.SheetByTitle(player.Name)
+				sheet, err := sched.SheetByTitle(player.Name)
 				if err != nil {
 					return fmt.Sprintf("Error grabbing %s's sheet.", player.Name), err
 				}
-				err = tryUpdate(sheet, player.Container[day], info.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"}, updateCell)
+				err = tryUpdate(sheet, player.Container[day], sched.Week.StartTime, 3, args, []string{"Yes", "Maybe", "No"}, updateCell)
 				if err != nil {
 					return err.Error(), err
 				}
-				err = info.Schedule.SyncSheet(sheet)
+				err = sched.SyncSheet(sheet)
 				if err != nil {
 					return err.Error(), err
 				}
@@ -104,13 +105,14 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 
 // Reset loads the default week schedule for a sheet
 func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
-		return "Error grabbing info", err
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
+		return "No team in this guild / channel", nil
 	}
+	sched := team.Schedule()
 
 	var j types.JSONText
-	err = DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", info.DocKey)
+	err := DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", team.DocKey)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No default week schedule for this sheet", nil
@@ -119,7 +121,7 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 		}
 	}
 
-	sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
+	sheet, err := sched.SheetByTitle("Weekly Schedule")
 	if err != nil {
 		return "Error grabbing week schedule", err
 	}
@@ -131,14 +133,14 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 	}
 
 	activities := w.Values()
-	for i, c := range info.Week.Container {
+	for i, c := range sched.Week.Container {
 		update(sheet, c[:], activities[i][:], updateCell)
 	}
-	err = info.Schedule.SyncSheet(sheet)
+	err = sched.SyncSheet(sheet)
 	if err != nil {
 		return "Error synchronizing sheets", err
 	}
-	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", info.Schedule.ID), info.Schedule.Week)
+	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", team.DocKey.String), sched.Week)
 	if err != nil {
 		return "Error caching new default week", err
 	}
@@ -148,25 +150,26 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 
 // Schedule updates notes on the week schedule, used for scheduling Scrims and stuff like that
 func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
-		return "Error grabbing info", err
-	} else if !info.DocKey.Valid {
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
+		return "No team for this guild / channel", nil
+	} else if !team.DocKey.Valid {
 		return "No doc key for this guild.", nil
 	}
+	sched := team.Schedule()
 
 	if len(args) >= 3 {
-		day := info.Week.DayInt(args[1])
+		day := sched.Week.DayInt(args[1])
 		if day != -1 {
-			sheet, err := info.Schedule.SheetByTitle("Weekly Schedule")
+			sheet, err := sched.SheetByTitle("Weekly Schedule")
 			if err != nil {
 				return fmt.Sprintf("Error grabbing week schedule: %s", err), err
 			}
-			err = tryUpdate(sheet, info.Week.Container[day], info.Week.StartTime, 2, args, []string{}, updateNote)
+			err = tryUpdate(sheet, sched.Week.Container[day], sched.Week.StartTime, 2, args, []string{}, updateNote)
 			if err != nil {
 				return "Error updating notes: " + err.Error(), err
 			}
-			err = info.Schedule.SyncSheet(sheet)
+			err = sched.SyncSheet(sheet)
 			if err != nil {
 				return fmt.Sprintf("Error updating notes: %s", err), err
 			}

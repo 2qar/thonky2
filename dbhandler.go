@@ -1,6 +1,7 @@
-package db
+package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -40,25 +41,34 @@ type Handler struct {
 	*sqlx.DB
 }
 
-// GetTeamName returns the name of a team in a given channel
-func (d *Handler) GetTeamName(channelID string) (string, error) {
+// AddTeam adds a team to the database
+func (d *Handler) AddTeam(guildID, name, channel string) error {
+	var t Team
+	err := d.Get(&t, "SELECT * FROM teams WHERE server_id=$1", "0")
+	if err != nil {
+		return nil
+	}
+	t.GuildID = guildID
+	t.Name = sql.NullString{String: name, Valid: true}
+	t.Channels = pq.StringArray([]string{channel})
+	_, err = d.Query(`INSERT INTO teams
+	(server_id, team_name, channels, remind_activities, remind_intervals, update_interval)
+	VALUES ($1, $2, $3, $4, $5, $6)`, t.GuildID, t.Name, t.Channels, t.RemindActivities, t.RemindIntervals, t.UpdateInterval)
+	return err
+}
+
+// GetName returns the name of a team in a given channel
+func (d *Handler) GetName(channelID string) (string, error) {
 	var teamName string
 	err := d.Get(&teamName, "SELECT team_name FROM teams WHERE $1 = ANY(channels)", channelID)
 	return teamName, err
 }
 
 // GetTeams gets the config for each team in a server
-func (d *Handler) GetTeams(guildID string) ([]*TeamConfig, error) {
-	teams := []*TeamConfig{}
+func (d *Handler) GetTeams(guildID string) ([]*Team, error) {
+	teams := []*Team{}
 	err := d.Select(&teams, "SELECT * FROM teams WHERE server_id=$1", guildID)
 	return teams, err
-}
-
-// GetGuild gets the config for a guild
-func (d *Handler) GetGuild(guildID string) (*TeamConfig, error) {
-	guild := &TeamConfig{}
-	err := d.Get(guild, "SELECT * FROM server_config WHERE server_id=$1", guildID)
-	return guild, err
 }
 
 // ExecJSON runs a query with a JSON representation of v.

@@ -20,10 +20,10 @@ func init() {
 	AddCommand("od", "Get information about another team or a round of Open Division", examples, OD)
 }
 
-// OD grabs information about another team
+// OD grabs teamrmation about another team
 func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
 		return "No config for this guild.", nil
 	}
 
@@ -34,13 +34,13 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 	name := m.Content[4:]
 	num, err := strconv.Atoi(name)
 	if err != nil {
-		if !info.TournamentLink.Valid {
+		if !team.TournamentLink.Valid {
 			return "No tournament link for this team.", nil
 		}
 
-		tournamentID := strings.Split(info.TournamentLink.String, "/")[5]
-		var info odscraper.TeamInfo
-		names, err := odscraper.FindTeam(tournamentID, name, &info)
+		tournamentID := strings.Split(team.TournamentLink.String, "/")[5]
+		var team odscraper.TeamInfo
+		names, err := odscraper.FindTeam(tournamentID, name, &team)
 		if err != nil {
 			if strings.HasPrefix(err.Error(), "unable to find team") {
 				s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Unable to find team \"%s\"", name))
@@ -60,16 +60,16 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 				s.ChannelMessageSend(m.ChannelID, "Too many results.")
 			}
 		} else {
-			embed := formatTeamInfo(&info)
+			embed := formatTeamInfo(&team)
 			s.ChannelMessageSendEmbed(m.ChannelID, embed)
 		}
 	} else {
-		if !info.TeamID.Valid {
+		if !team.TeamID.Valid {
 			return "No team ID for this team.", nil
-		} else if !info.TournamentLink.Valid {
+		} else if !team.TournamentLink.Valid {
 			return "No tournament link for this team.", nil
 		}
-		t, err := odscraper.GetOtherTeam(info.TournamentLink.String, info.TeamID.String, num)
+		t, err := odscraper.GetOtherTeam(team.TournamentLink.String, team.TeamID.String, num)
 		if err != nil {
 			return fmt.Sprintf("No data for round %d. :(", num), err
 		}

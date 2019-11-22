@@ -11,14 +11,15 @@ func init() {
 
 // Update updates the sheet locally
 func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
 		return "No config for this guild.", nil
-	} else if !info.DocKey.Valid {
+	} else if !team.DocKey.Valid {
 		return "No doc key for this guild.", nil
 	}
+	sched := team.Schedule()
 
-	updated, err := info.Schedule.Updated()
+	updated, err := sched.Updated()
 	if err != nil {
 		return "Error checking if the sheet is updated. :(", err
 	} else if updated {
@@ -26,7 +27,7 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (st
 	}
 	msg, _ := s.ChannelMessageSend(m.ChannelID, "Updating...")
 
-	err = info.Update()
+	err = sched.Update()
 	if err != nil {
 		if err.Error() == "already updating" {
 			s.ChannelMessageEdit(m.ChannelID, msg.ID, "Already updating.")

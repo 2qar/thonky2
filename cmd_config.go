@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/lib/pq"
 )
 
 func init() {
@@ -56,9 +54,9 @@ func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
 
 // AddTeam adds a team to a guild
 func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info := guildInfo[m.GuildID]
-	if info == nil {
-		return "No info for this guild.", fmt.Errorf("no info for [%s]\n", m.GuildID)
+	team := GuildTeam(m.GuildID)
+	if team == nil {
+		return "No team for this guild.", fmt.Errorf("no team for [%s]\n", m.GuildID)
 	}
 
 	if len(args) != 3 {
@@ -79,31 +77,15 @@ func AddTeam(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (s
 		return "I don't have permission to send messages in that channel. :(", nil
 	}
 
-	if name, err := DB.GetTeamName(chanID); err == nil {
+	if name, err := DB.GetName(chanID); err == nil {
 		return fmt.Sprintf("Channel already occupied by %q", name), nil
 	}
 
-	config, err := DB.GetGuild("0")
+	err = DB.AddTeam(m.GuildID, args[1], chanID)
 	if err != nil {
 		return err.Error(), err
 	}
-	config.GuildID = m.GuildID
-	config.TeamName = args[1]
-	channelInt, err := strconv.ParseInt(chanID, 10, 64)
-	if err != nil {
-		return "Error adding team, something stupid happened", err
-	}
-	config.Channels = pq.Int64Array([]int64{channelInt})
-	r, err := DB.Query("INSERT INTO teams (server_id, team_name, channels, remind_activities, remind_intervals, update_interval) VALUES ($1, $2, $3, $4, $5, $6)", config.GuildID, config.TeamName, config.Channels, config.RemindActivities, config.RemindIntervals, config.UpdateInterval)
-	if err != nil {
-		return err.Error(), err
-	}
-	defer r.Close()
 
-	err = info.AddTeam(config)
-	if err != nil {
-		return "Error adding team: " + err.Error(), err
-	}
 	log.Printf("added team %q to guild [%s]\n", args[1], m.GuildID)
 	return "Added team.", nil
 }
@@ -114,12 +96,12 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return "No channels given!", nil
 	}
 
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
 		return "No config for this guild.", nil
 	}
 
-	if info.TeamName == "" {
+	if team.Name.String == "" {
 		return "No team in this channel.", nil
 	}
 
@@ -127,8 +109,8 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	for _, arg := range givenChannels {
 		if !isChannel(arg) {
 			return fmt.Sprintf("Invalid channel %q.", arg), nil
-		} else if name, err := DB.GetTeamName(channelID(arg)); err == nil {
-			if name == info.TeamName {
+		} else if name, err := DB.GetName(channelID(arg)); err == nil {
+			if name == team.Name.String {
 				return arg + " already added.", nil
 			} else {
 				return fmt.Sprintf("%s already occupied by %q.", arg, name), nil
@@ -142,9 +124,9 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		}
 	}
 
-	for _, id := range info.Channels {
+	for _, id := range team.Channels {
 		for i, givenID := range givenChannels {
-			if strconv.FormatInt(id, 10) == givenID[2:len(givenID)-1] {
+			if id == givenID[2:len(givenID)-1] {
 				givenChannels = append(givenChannels[:i], givenChannels[i+1:]...)
 			}
 		}
@@ -155,14 +137,10 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	}
 
 	for _, id := range givenChannels {
-		i, err := strconv.ParseInt(id, 10, 64)
-		if err != nil {
-			return "Error updating channels.", err
-		}
-		info.Channels = append(info.Channels, i)
+		team.Channels = append(team.Channels, id)
 	}
 
-	r, err := DB.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", info.Channels, m.GuildID, info.TeamName)
+	r, err := DB.Query("UPDATE teams SET channels = $1 WHERE server_id = $2 AND team_name = $3", team.Channels, m.GuildID, team.Name)
 	defer r.Close()
 	if err != nil {
 		return "Error updating channels.", err
@@ -173,30 +151,30 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 
 // Save saves a sheet's current week schedule for resetting to
 func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
-		return "Error grabbing info: " + err.Error(), err
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
+		return "No teams in this server / channel", nil
 	}
 
 	var b []byte
-	b, err = json.Marshal(info.Week)
+	b, err := json.Marshal(team.Schedule().Week)
 	if err != nil {
 		return "Error encoding schedule, something stupid happened", err
 	}
 
-	r, err := DB.Query("SELECT id FROM sheet_info WHERE id = $1", info.DocKey)
+	r, err := DB.Query("SELECT id FROM sheet_info WHERE id = $1", team.DocKey)
 	if err != nil {
 		return "Error querying database, something stupid happened", nil
 	}
 	defer r.Close()
 
 	if r.Next() {
-		_, err := DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, info.DocKey)
+		_, err := DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, team.DocKey)
 		if err != nil {
 			return "Error updating default", err
 		}
 	} else {
-		_, err := DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", info.DocKey, b)
+		_, err := DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", team.DocKey, b)
 		if err != nil {
 			return "Error setting default", err
 		}
@@ -206,9 +184,9 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (stri
 
 // SetTournament sets the battlefy tournament for the current team
 func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	info, err := GetInfo(m.GuildID, m.ChannelID)
-	if err != nil {
-		return "Error grabbing info", nil
+	team := FindTeam(m.GuildID, m.ChannelID)
+	if team == nil {
+		return "Error grabbing team", nil
 	}
 
 	if len(args) > 2 {
@@ -222,12 +200,11 @@ func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		return "Invalid tournament URL", nil
 	}
 
-	// TODO: merge "server_config" and "teams" table so i don't have to do this shit
-	if info.TeamName == "" {
-		_, err = DB.Exec("UPDATE server_config SET tournament_link = $1 WHERE server_id = $2", url, info.GuildID)
-	} else {
-		_, err = DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], info.GuildID, info.TeamName)
+	_, err := DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], team.GuildID, team.Name)
+	if err != nil {
+		return "Error updating tournament url: " + err.Error(), err
 	}
+	_, err = DB.Exec("UPDATE teams SET tournament_link = $1 WHERE server_id = $2 AND team_name = $3", url, team.GuildID, team.Name)
 	if err != nil {
 		return "Error updating tournament url: " + err.Error(), err
 	}

@@ -13,7 +13,6 @@ import (
 	"syscall"
 
 	"github.com/bigheadgeorge/spreadsheet"
-	"github.com/bigheadgeorge/thonky2/db"
 	"github.com/bigheadgeorge/thonky2/schedule"
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/oauth2/google"
@@ -23,7 +22,7 @@ var (
 	botUserID string
 
 	// DB is used for accessing the PSQL db
-	DB *db.Handler
+	DB *Handler
 
 	// Client is an authenticated http client for accessing Google APIs
 	Client *http.Client
@@ -54,7 +53,7 @@ func main() {
 		panic("no google api key in config.json")
 	}
 
-	h, err := db.NewHandler()
+	h, err := NewHandler()
 	if err != nil {
 		panic(err)
 	}
@@ -106,12 +105,20 @@ func ready(s *discordgo.Session, r *discordgo.Ready) {
 	botUserID = r.User.ID
 
 	for _, guild := range r.Guilds {
-		info, err := NewGuildInfo(guild.ID)
+		var t []*Team
+		err := DB.Select(&t, "SELECT * FROM teams WHERE server_id = $1", guild.ID)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		guildInfo[guild.ID] = info
+		teams[guild.ID] = t
+		log.Printf("%+v\n", teams[guild.ID])
+		for _, team := range teams[guild.ID] {
+			err = initTeam(team)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 		log.Println("added config for", guild.ID)
 	}
 }
