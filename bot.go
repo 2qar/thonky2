@@ -100,7 +100,6 @@ func main() {
 
 func ready(s *discordgo.Session, r *discordgo.Ready) {
 	log.Println("ready")
-	botUserID = r.User.ID
 
 	for _, guild := range r.Guilds {
 		var t []*Team
