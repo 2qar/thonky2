@@ -45,7 +45,7 @@ func channelID(s string) string {
 
 // sendPermission checks whether the bot has permission to send messages in a channel
 func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
-	perms, err := s.State.UserChannelPermissions(botUserID, channelID)
+	perms, err := s.State.UserChannelPermissions(s.State.User.ID, channelID)
 	if err != nil {
 		return false, err
 	}
