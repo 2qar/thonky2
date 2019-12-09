@@ -19,8 +19,6 @@ import (
 )
 
 var (
-	botUserID string
-
 	// DB is used for accessing the PSQL db
 	DB *Handler
 
@@ -71,8 +69,6 @@ func main() {
 	Client = c.Client(context.Background())
 	Service = spreadsheet.NewServiceWithClient(Client)
 
-	logFile := StartLog()
-
 	d, err := discordgo.New("Bot " + config.Token)
 	if err != nil {
 		panic(err)
@@ -86,6 +82,9 @@ func main() {
 		panic(err)
 	}
 
+	log.SetOutput(os.Stdout)
+	log.SetFlags(log.Ltime + log.Lshortfile)
+
 	err = StartReminders(d)
 	if err != nil {
 		log.Println(err)
@@ -96,7 +95,6 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
 
-	CompressLog(logFile)
 	d.Close()
 }
 
