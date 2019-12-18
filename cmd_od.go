@@ -28,16 +28,12 @@ type Player interface {
 	// Active() bool
 }
 
-// Team has methods for getting team info.
-/*
-type Team interface {
+// ODTeam has methods for getting team info.
+type ODTeam interface {
 	Name() string
 	Logo() string
 	Link() string
-	Players() []Player
-	ActivePlayers() []string
 }
-*/
 
 // OD grabs information about another team
 func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
@@ -48,7 +44,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 		return "No args.", nil
 	}
 
-	var name, logo, link string
+	var odt ODTeam
 	var players []Player
 
 	teamName := m.Content[4:]
@@ -60,11 +56,11 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 		}
 
 		tournamentID := strings.Split(team.TournamentLink.String, "/")[5]
-		var team battlefy.TeamInfo
+		var team battlefy.Team
 		names, err := battlefy.FindTeam(tournamentID, teamName, &team)
 		if err != nil {
 			if strings.HasPrefix(err.Error(), "unable to find team") {
-				return fmt.Sprintf("Unable to find team \"%s\"", name), nil
+				return fmt.Sprintf("Unable to find team \"%s\"", teamName), nil
 			}
 			return err.Error(), err
 		}
@@ -81,7 +77,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 			return "Too many results.", nil
 		}
 
-		name, logo, link = team.Name, team.Logo, team.Link
+		odt = team
 		players = make([]Player, len(team.Players))
 		for i := range team.Players {
 			players[i] = team.Players[i]
@@ -98,14 +94,14 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 			return fmt.Sprintf("No data for round %d. :(", num), err
 		}
 
-		name, logo, link = t.Name, t.Logo, t.Link
+		odt = t
 		players = make([]Player, len(t.Players))
 		for i := range t.Players {
 			players[i] = t.Players[i]
 		}
 	}
 
-	embed := formatTeam(name, logo, link, convertPlayers(players))
+	embed := formatTeam(odt, convertPlayers(players))
 	s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	return "", nil
 }
@@ -148,7 +144,7 @@ func averageSR(players []goverbuff.Player) int {
 }
 
 // formatTeam formats a team and it's players into a fancy embed
-func formatTeam(name, logo, link string, players []goverbuff.Player) *discordgo.MessageEmbed {
+func formatTeam(odt ODTeam, players []goverbuff.Player) *discordgo.MessageEmbed {
 	roleEmotes := map[string]string{
 		"Defense": ":crossed_swords:",
 		"Offense": ":crossed_swords:",
@@ -159,11 +155,12 @@ func formatTeam(name, logo, link string, players []goverbuff.Player) *discordgo.
 	embed := &discordgo.MessageEmbed{
 		Color: 0xe74c3c,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
-			URL: logo,
+			URL: odt.Logo(),
 		},
 		Author: &discordgo.MessageEmbedAuthor{
-			Name:    name,
-			URL:     link,
+			Name: odt.Name(),
+			URL:  odt.Link(),
+			// TODO: take the logo as an argument (gamebattles logo, battlefy logo)
 			IconURL: battlefyLogo,
 		},
 	}

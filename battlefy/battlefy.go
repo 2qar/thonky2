@@ -11,8 +11,8 @@ import (
 const cloudfront = "https://dtmwra1jsgyb0.cloudfront.net/"
 
 // FindTeam returns a list of team names found, or an error if none are found.
-// If only one team is found, the TeamInfo will be written to t.
-func FindTeam(tournamentID, name string, t *TeamInfo) ([]string, error) {
+// If only one team is found, the Team will be written to t.
+func FindTeam(tournamentID, name string, t *Team) ([]string, error) {
 	url := cloudfront + "tournaments/" + tournamentID + "/" + "teams?name=" + name
 	resp, err := http.Get(url)
 	if err != nil {
@@ -28,12 +28,12 @@ func FindTeam(tournamentID, name string, t *TeamInfo) ([]string, error) {
 	if len(teams) == 0 {
 		return []string{}, fmt.Errorf("unable to find team \"%s\"", name)
 	} else if len(teams) == 1 {
-		info, err := getTeamInfo(teams[0])
+		team, err := getTeam(teams[0])
 		if err != nil {
 			return []string{}, err
 		}
-		*t = info
-		return []string{info.Name}, nil
+		*t = team
+		return []string{team.Name()}, nil
 	} else {
 		names := []string{}
 		for _, team := range teams {
@@ -44,7 +44,7 @@ func FindTeam(tournamentID, name string, t *TeamInfo) ([]string, error) {
 }
 
 // GetOtherTeam get information on the enemy team in a round of Open Division
-func GetOtherTeam(tournamentLink, teamID string, round int) (e TeamInfo, err error) {
+func GetOtherTeam(tournamentLink, teamID string, round int) (e Team, err error) {
 	cutIndex := strings.LastIndex(tournamentLink, "/") + 1
 	stageID := tournamentLink[cutIndex:]
 
@@ -53,26 +53,26 @@ func GetOtherTeam(tournamentLink, teamID string, round int) (e TeamInfo, err err
 		return
 	}
 
-	e, err = getTeamInfo(m.Team().Info)
+	e, err = getTeam(m.Team().Info)
 	if err != nil {
 		return
 	}
 
-	e.Link = tournamentLink + "/match/" + m.ID
+	e.setLink(tournamentLink + "/match/" + m.ID)
 	return
 }
 
-func getTeamInfo(t teamData) (TeamInfo, error) {
+func getTeam(t teamData) (Team, error) {
 	resp, err := http.Get(cloudfront + "persistent-teams/" + t.PID)
 	if err != nil {
-		return TeamInfo{}, err
+		return Team{}, err
 	}
 	defer resp.Body.Close()
 
 	var pts [1]persistentTeam
 	err = json.NewDecoder(resp.Body).Decode(&pts)
 	if err != nil {
-		return TeamInfo{}, err
+		return Team{}, err
 	}
 	pt := pts[0]
 
@@ -86,10 +86,10 @@ func getTeamInfo(t teamData) (TeamInfo, error) {
 		}
 	}
 
-	return TeamInfo{
-		Link:    "https://www.battlefy.com/teams/" + t.PID,
-		Name:    pt.Name,
-		Logo:    pt.Logo,
+	return Team{
+		link:    "https://www.battlefy.com/teams/" + t.PID,
+		name:    pt.Name,
+		logo:    pt.Logo,
 		Players: append([]Player{pt.Captain}, t.Players[:]...)}, nil
 }
 
@@ -158,12 +158,28 @@ func (p Player) Active() bool {
 	return p.active
 }
 
-// TeamInfo stores info about a team scraped from Battlefy, including stats about their players.
-type TeamInfo struct {
-	Link    string
-	Name    string
-	Logo    string
+// Team stores info about a team scraped from Battlefy, including stats about their players.
+type Team struct {
+	link    string
+	name    string
+	logo    string
 	Players []Player
+}
+
+func (t Team) Name() string {
+	return t.name
+}
+
+func (t *Team) setLink(link string) {
+	t.link = link
+}
+
+func (t Team) Link() string {
+	return t.link
+}
+
+func (t Team) Logo() string {
+	return t.logo
 }
 
 // Find a match in the given round where a team with the given id is playing
