@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -28,9 +29,11 @@ func init() {
 	AddCommand("save", "Save the week schedule", examples, Save)
 
 	examples = [][2]string{
-		{"!set_tournament https://battlefy.com/overwatch-open-division-north-america/2019-overwatch-open-division-practice-season-north-america/5d6fdb02c747ff732da36eb4/stage/5d7b716bb7758c268b771f83/bracket/1", "Update the current tournament"},
+		{"!set_tournament https://battlefy.com/overwatch-open-division-north-america/2019-overwatch-open-division-practice-season-north-america/5d6fdb02c747ff732da36eb4/stage/5d7b716bb7758c268b771f83/bracket/1", "Update the current tournament to a Battlefy tournament."},
+		{"!set_tournament https://gamebattles.majorleaguegaming.com/pc/overwatch/tournament/Breakable-Barriers-EMEA-2", "Update the current tournament to a Gamebattles tournament."},
+		{"!set tournament https://gamebattles.majorleaguegaming.com/pc/overwatch/tournament/Breakable-Barriers-EMEA-2 https://gamebattles.majorleaguegaming.com/pc/overwatch/team/33834248", "Update the current tournament and team."},
 	}
-	AddCommand("set_tournament", "Update the current tournament", examples, SetTournament).AddAliases("set_tourney")
+	AddCommand("set_tournament", "Update the current tournament and team.", examples, SetTournament).AddAliases("set_tourney")
 }
 
 func isChannel(s string) bool {
@@ -101,7 +104,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return "No config for this guild.", nil
 	}
 
-	if team.Name.String == "" {
+	if team.Name == "" {
 		return "No team in this channel.", nil
 	}
 
@@ -110,7 +113,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		if !isChannel(arg) {
 			return fmt.Sprintf("Invalid channel %q.", arg), nil
 		} else if name, err := DB.GetName(channelID(arg)); err == nil {
-			if name == team.Name.String {
+			if name == team.Name {
 				return arg + " already added.", nil
 			} else {
 				return fmt.Sprintf("%s already occupied by %q.", arg, name), nil
@@ -182,31 +185,56 @@ func Save(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (stri
 	return "Updated default week schedule. :)", nil
 }
 
-// SetTournament sets the battlefy tournament for the current team
+// SetTournament updates the tournament a team is participating in and, optionally, their team on the tournament site.
 func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "Error grabbing team", nil
 	}
 
-	if len(args) > 2 {
-		return "Too many arguments", nil
+	if len(args) > 3 {
+		return "Too many arguments.", nil
 	} else if len(args) == 1 {
-		return "No URL given.", nil
+		return "No arguments; missing tournament link and team link.", nil
 	}
 
-	url := regexp.MustCompile(`https://battlefy.com/[\w\d-]{1,}/[\w\d-]{1,}/[\d\w]{24}/stage/[\d\w]{24}`).FindString(args[1])
-	if url == "" {
+	tournamentRegexes := []string{
+		`https://battlefy.com/[\w\d-]{1,}/[\w\d-]{1,}/[\d\w]{24}/stage/[\d\w]{24}`,
+		`https://gamebattles.majorleaguegaming.com/pc/.+/tournament/[\w\d-]+`,
+	}
+	var url, re string
+	var site int
+	for site, re = range tournamentRegexes {
+		url = regexp.MustCompile(re).FindString(args[1])
+		if len(url) > 0 {
+			break
+		}
+	}
+	if len(url) == 0 {
 		return "Invalid tournament URL", nil
+	} else if len(args) == 2 && site != team.ODSite {
+		return "Incompatible tournament URL; give me the new tournament link AND your new team link.", nil
 	}
 
-	_, err := DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], team.GuildID, team.Name)
-	if err != nil {
-		return "Error updating tournament url: " + err.Error(), err
+	teamRegexes := []string{
+		`https://battlefy.com/teams/.+`,
+		`https://gamebattles.majorleaguegaming.com/pc/.+/team/\d+`,
 	}
-	_, err = DB.Exec("UPDATE teams SET tournament_link = $1 WHERE server_id = $2 AND team_name = $3", url, team.GuildID, team.Name)
-	if err != nil {
-		return "Error updating tournament url: " + err.Error(), err
+	var teamURL string
+	if len(args) == 3 {
+		teamURL = regexp.MustCompile(teamRegexes[site]).FindString(args[2])
+		if len(teamURL) == 0 {
+			return "Incompatible team link; your tournament and team links are from two different websites.", nil
+		}
 	}
-	return "Updated tournament URL. :)", nil
+
+	team.StageID = sql.NullString{String: url[strings.LastIndex(url, "/")+1:], Valid: true}
+	team.TournamentLink = sql.NullString{String: url, Valid: true}
+	team.TeamID = sql.NullString{String: teamURL[strings.LastIndex(teamURL, "/")+1:], Valid: true}
+	team.ODSite = site
+	_, err := DB.Exec("UPDATE teams SET stage_id = $1, tournament_link = $2, od_site = $3, team_id = $4 WHERE server_id = $5 AND team_name = $6", team.StageID, url, site, team.TeamID, team.GuildID, team.Name)
+	if err != nil {
+		return "Error updating tournament: " + err.Error(), err
+	}
+	return "Updated tournament. :)", nil
 }

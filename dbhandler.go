@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -49,7 +48,7 @@ func (d *Handler) AddTeam(guildID, name, channel string) error {
 		return nil
 	}
 	t.GuildID = guildID
-	t.Name = sql.NullString{String: name, Valid: true}
+	t.Name = name
 	t.Channels = pq.StringArray([]string{channel})
 	_, err = d.Query(`INSERT INTO teams
 	(server_id, team_name, channels, remind_activities, remind_intervals, update_interval)

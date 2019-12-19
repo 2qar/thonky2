@@ -121,3 +121,6 @@ func GetTeam(id string) (Team, error) {
 	teamJSON.Body.TeamWithEligibilityAndPremiumStatus.Team.Players = players
 	return teamJSON.Body.TeamWithEligibilityAndPremiumStatus.Team, nil
 }
+
+// TODO: add a team search function
+// https://gamebattles.majorleaguegaming.com/pc/overwatch/tournament/Breakable-Barriers-NA-1/teams

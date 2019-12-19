@@ -40,6 +40,8 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
+	} else if team.ODSite == -1 {
+		return "No site configured; use !set_tournament.", nil
 	} else if len(args) == 1 {
 		return "No args.", nil
 	}
@@ -55,6 +57,7 @@ func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string
 			return "No tournament link for this team.", nil
 		}
 
+		// TODO: check team.ODSite when doing tournament searches or getting team stats for next round
 		tournamentID := strings.Split(team.TournamentLink.String, "/")[5]
 		var team battlefy.Team
 		names, err := battlefy.FindTeam(tournamentID, teamName, &team)
