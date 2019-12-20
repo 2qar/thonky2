@@ -44,10 +44,11 @@ func (p Player) Active() bool {
 
 // Team stores team information and info on the team's players.
 type Team struct {
-	Players   []Player `json:"-"`
+	ID        uint     `json:"id"`
 	TeamName  string   `json:"name"`
 	AvatarURL string   `json:"avatarUrl"`
 	URL       string   `json:"url"`
+	Players   []Player `json:"-"`
 }
 
 func (t Team) Name() string {
