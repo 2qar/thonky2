@@ -138,7 +138,10 @@ func GetTeams(tournamentID string) ([]Team, error) {
 			Code string
 		}
 		Body struct {
-			Records []Team
+			TotalRecords int
+			Records      []struct {
+				Team Team
+			}
 		}
 	}{}
 
@@ -149,7 +152,12 @@ func GetTeams(tournamentID string) ([]Team, error) {
 		return []Team{}, fmt.Errorf("error getting teams in tournament %q: %s", tournamentID, teamsJSON.Errors[0].Code)
 	}
 
-	return teamsJSON.Body.Records, nil
+	teams := make([]Team, 0, teamsJSON.Body.TotalRecords)
+	for _, record := range teamsJSON.Body.Records {
+		teams = append(teams, record.Team)
+	}
+
+	return teams, nil
 }
 
 // GetTournamentID gets the ID of the tournament with the given name.
