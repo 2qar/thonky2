@@ -1,6 +1,7 @@
 {
 	"token": "",
 	"google_api_key": "",
+	"database": "",
 	"user": "",
 	"pw": "",
 	"host": ""

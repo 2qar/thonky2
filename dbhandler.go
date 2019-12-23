@@ -20,13 +20,14 @@ func NewHandler() (handler Handler, err error) {
 	}
 
 	config := struct {
-		User string
-		Pw   string
-		Host string
+		User     string
+		Pw       string
+		Host     string
+		Database string
 	}{}
 	err = json.Unmarshal(b, &config)
 
-	connStr := fmt.Sprintf("user=%s password=%s host=%s dbname=thonkydb", config.User, config.Pw, config.Host)
+	connStr := fmt.Sprintf("user=%s password=%s host=%s dbname=%s", config.User, config.Pw, config.Host, config.Database)
 	db, err := sqlx.Open("postgres", connStr)
 	if err != nil {
 		return
