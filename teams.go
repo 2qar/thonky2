@@ -17,6 +17,7 @@ var (
 
 // Team holds the config for a team in a guild.
 type Team struct {
+	ID               int            `db:"id"`
 	GuildID          string         `db:"server_id"`
 	Name             string         `db:"team_name"`
 	Channels         pq.StringArray `db:"channels"`
@@ -25,11 +26,7 @@ type Team struct {
 	RemindActivities pq.StringArray `db:"remind_activities"`
 	RemindIntervals  pq.Int64Array  `db:"remind_intervals"`
 	RoleMention      sql.NullString `db:"role_mention"`
-	TeamID           sql.NullString `db:"team_id"`
 	UpdateInterval   int            `db:"update_interval"`
-	StageID          sql.NullString `db:"stage_id"`
-	TournamentLink   sql.NullString `db:"tournament_link"`
-	ODSite           int            `db:"od_site"`
 }
 
 // Guild returns whether this team represents an entire Discord guild or not

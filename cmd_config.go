@@ -210,29 +210,45 @@ func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 			break
 		}
 	}
+	var siteTable string
+	switch site {
+	case 0:
+		siteTable = "battlefy"
+	case 1:
+		siteTable = "gamebattles"
+	}
 	if len(url) == 0 {
-		return "Invalid tournament URL", nil
-	} else if len(args) == 2 && site != team.ODSite {
-		return "Incompatible tournament URL; give me the new tournament link AND your new team link.", nil
+		return "Invalid / unsupported tournament URL.", nil
+	} else if len(args) == 2 {
+		err := DB.QueryRow(fmt.Sprintf("SELECT team FROM %s WHERE team = $1", siteTable), team.ID).Scan(&team.ID)
+		if err == sql.ErrNoRows {
+			return "No config yet; give me both your tournament link AND your team link.", err
+		}
 	}
 
-	teamRegexes := []string{
-		`https://battlefy.com/teams/.+`,
-		`https://gamebattles.majorleaguegaming.com/pc/.+/team/\d+`,
-	}
 	var teamURL string
 	if len(args) == 3 {
+		teamRegexes := []string{
+			`https://battlefy.com/teams/.+`,
+			`https://gamebattles.majorleaguegaming.com/pc/.+/team/\d+`,
+		}
 		teamURL = regexp.MustCompile(teamRegexes[site]).FindString(args[2])
 		if len(teamURL) == 0 {
 			return "Incompatible team link; your tournament and team links are from two different websites.", nil
 		}
 	}
 
-	team.StageID = sql.NullString{String: url[strings.LastIndex(url, "/")+1:], Valid: true}
-	team.TournamentLink = sql.NullString{String: url, Valid: true}
-	team.TeamID = sql.NullString{String: teamURL[strings.LastIndex(teamURL, "/")+1:], Valid: true}
-	team.ODSite = site
-	_, err := DB.Exec("UPDATE teams SET stage_id = $1, tournament_link = $2, od_site = $3, team_id = $4 WHERE server_id = $5 AND team_name = $6", team.StageID, url, site, team.TeamID, team.GuildID, team.Name)
+	var err error
+	teamID := teamURL[strings.LastIndex(teamURL, "/")+1:]
+	switch site {
+	case 0:
+		//_, err = DB.Exec("UPDATE battlefy SET stage_id = $1, tournament_link = $2, team_id = $3 WHERE team = $4", url[strings.LastIndex(url, "/")+1:], url, teamID, team.ID)
+		_, err = DB.Exec("INSERT INTO battlefy (team, stage_id, tournament_link, team_id) VALUES ($1, $2, $3, $4) ON CONFLICT (team) DO UPDATE SET stage_id = EXCLUDED.stage_id, tournament_link = EXCLUDED.tournament_link, team_id = EXCLUDED.team_id", team.ID, url[strings.LastIndex(url, "/")+1:], url, teamID)
+	case 1:
+		log.Println("updating gamebattles")
+		//_, err = DB.Exec("UPDATE gamebattles SET tournament_link = $1, team_id = $2 WHERE team = $3", url, teamID, team.ID)
+		_, err = DB.Exec("INSERT INTO gamebattles (team, tournament_link, team_id) VALUES ($1, $2, $3) ON CONFLICT (team) DO UPDATE SET tournament_link = EXCLUDED.tournament_link, team_id = EXCLUDED.team_id", team.ID, url, teamID)
+	}
 	if err != nil {
 		return "Error updating tournament: " + err.Error(), err
 	}

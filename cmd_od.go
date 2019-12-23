@@ -8,26 +8,14 @@ import (
 	"sync"
 
 	"github.com/bigheadgeorge/goverbuff"
-	"github.com/bigheadgeorge/thonky2/battlefy"
-	"github.com/bigheadgeorge/thonky2/gamebattles"
 	"github.com/bwmarrin/discordgo"
 )
 
-const battlefyLogo = "http://s3.amazonaws.com/battlefy-assets/helix/images/logos/logo.png"
+// searchOD searches the participants in a tournament for the given name.
+type searchOD func(int, string, *ODInfo) (string, error)
 
-const (
-	SiteUndefined int = iota - 1
-	SiteBattlefy
-	SiteGamebattles
-)
-
-func init() {
-	examples := [][2]string{
-		{"!od 1", "Get info on the other team in round 1."},
-		{"!od cloud9", "Get info on cloud9, if they're in our tournament."},
-	}
-	AddCommand("od", "Get information about another team or a round of Open Division", examples, OD)
-}
+// matchOD gets stats for the opposing team in a given round in a tournament.
+type matchOD func(int, int, *ODInfo) (string, error)
 
 // Player has methods for getting information about a player.
 type Player interface {
@@ -41,115 +29,36 @@ type ODTeam interface {
 	Link() string
 }
 
-// OD grabs information about another team
-func OD(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+// ODInfo glues a ODTeam and []Player together
+type ODInfo struct {
+	Team    ODTeam
+	Players []Player
+}
+
+// OD grabs information about another team.
+func OD(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *discordgo.MessageEmbed) (string, error) {
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
-	} else if team.ODSite == SiteUndefined {
-		return "No site configured; use !set_tournament.", nil
-	} else if len(args) == 1 {
+	} else if strings.Count(m.Content, " ") == 0 { // hacky argument check
 		return "No args.", nil
 	}
 
-	var siteLogoURL string
-	switch team.ODSite {
-	case SiteBattlefy:
-		siteLogoURL = "http://s3.amazonaws.com/battlefy-assets/helix/images/logos/logo.png"
-	case SiteGamebattles:
-		siteLogoURL = "https://gamebattles.majorleaguegaming.com/gb-web/assets/favicon.ico"
-	}
-
-	var odt ODTeam
-	var players []Player
+	var msg string
+	var odi ODInfo
 
 	teamName := m.Content[4:]
 	num, err := strconv.Atoi(teamName)
 	if err != nil {
-		switch team.ODSite {
-		case SiteBattlefy:
-			tournamentID := strings.Split(team.TournamentLink.String, "/")[5]
-			var team battlefy.Team
-			names, err := battlefy.FindTeam(tournamentID, teamName, &team)
-			if err != nil {
-				if strings.HasPrefix(err.Error(), "unable to find team") {
-					return fmt.Sprintf("Unable to find team \"%s\"", teamName), nil
-				}
-				return err.Error(), err
-			}
-
-			if len(names) > 1 {
-				return formatNames(names), nil
-			}
-
-			odt = team
-			players = make([]Player, len(team.Players))
-			for i := range team.Players {
-				players[i] = team.Players[i]
-			}
-		case SiteGamebattles:
-			urlSplit := strings.Split(team.TournamentLink.String, "/")
-			id, err := gamebattles.GetTournamentID(urlSplit[6], urlSplit[4], urlSplit[3])
-			if err != nil {
-				return fmt.Sprintf("Error getting tournament ID: %s", id), err
-			}
-			teams, err := gamebattles.GetTeams(id)
-			if err != nil {
-				return fmt.Sprintf("Error getting participant list: %s", id), err
-			}
-			var foundTeams []gamebattles.Team
-			for _, team := range teams {
-				if strings.Contains(team.TeamName, teamName) {
-					foundTeams = append(foundTeams, team)
-				}
-			}
-
-			if len(foundTeams) > 1 {
-				var names []string
-				for _, team := range foundTeams {
-					names = append(names, team.TeamName)
-				}
-				return formatNames(names), nil
-			}
-
-			// pepega Xd
-			foundTeam, err := gamebattles.GetTeam(strconv.FormatUint(uint64(foundTeams[0].ID), 10))
-			if err != nil {
-				return fmt.Sprintf("Error grabbing players for team %s: %s", foundTeams[0].Name(), err), err
-			}
-			odt = foundTeam
-			players = make([]Player, len(foundTeam.Players))
-			for i := range foundTeam.Players {
-				players[i] = foundTeam.Players[i]
-			}
-		}
+		msg, err = search(team.ID, teamName, &odi)
 	} else {
-		switch team.ODSite {
-		case SiteBattlefy:
-			// show other team in OD round n
-			if !team.TeamID.Valid {
-				return "No team ID for this team.", nil
-			} else if !team.TournamentLink.Valid {
-				return "No tournament link for this team.", nil
-			}
-			t, err := battlefy.GetOtherTeam(team.TournamentLink.String, team.TeamID.String, num)
-			if err != nil {
-				return fmt.Sprintf("No data for round %d. :(", num), err
-			}
-
-			odt = t
-			players = make([]Player, len(t.Players))
-			for i := range t.Players {
-				players[i] = t.Players[i]
-			}
-		case SiteGamebattles:
-			// TODO: this
-			break
-		}
+		msg, err = match(team.ID, num, &odi)
+	}
+	if len(msg) > 0 || err != nil {
+		return msg, err
 	}
 
-	embed := formatTeam(siteLogoURL, odt, convertPlayers(players))
-	s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	embed = formatTeam(odi.Team, convertPlayers(odi.Players))
 	return "", nil
 }
 
@@ -205,7 +114,7 @@ func formatNames(names []string) string {
 }
 
 // formatTeam formats a team and it's players into a fancy embed
-func formatTeam(logoURL string, odt ODTeam, players []goverbuff.Player) *discordgo.MessageEmbed {
+func formatTeam(odt ODTeam, players []goverbuff.Player) *discordgo.MessageEmbed {
 	roleEmotes := map[string]string{
 		"Defense": ":crossed_swords:",
 		"Offense": ":crossed_swords:",
@@ -214,14 +123,12 @@ func formatTeam(logoURL string, odt ODTeam, players []goverbuff.Player) *discord
 	}
 
 	embed := &discordgo.MessageEmbed{
-		Color: 0xe74c3c,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: odt.Logo(),
 		},
 		Author: &discordgo.MessageEmbedAuthor{
-			Name:    odt.Name(),
-			URL:     odt.Link(),
-			IconURL: logoURL,
+			Name: odt.Name(),
+			URL:  odt.Link(),
 		},
 	}
 
