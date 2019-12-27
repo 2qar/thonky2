@@ -6,10 +6,11 @@ import "github.com/bigheadgeorge/spreadsheet"
 type Container [][]*spreadsheet.Cell
 
 // Values returns the string values of each cell
-func (c Container) Values() [][]string {
-	values := make([][]string, len(c))
-	for i, row := range c {
-		rowValues := make([]string, len(c[0]))
+func (c *Container) Values() [][]string {
+	container := *c
+	values := make([][]string, len(container))
+	for i, row := range *c {
+		rowValues := make([]string, len(container[0]))
 		for j, cell := range row {
 			rowValues[j] = cell.Value
 		}
@@ -19,7 +20,7 @@ func (c Container) Values() [][]string {
 }
 
 // Fill fills a cell container with cells on a sheet starting at a given row and column.
-func (c Container) Fill(sheet *spreadsheet.Sheet, rowStart, rows, colStart, cols int) {
+func (c *Container) Fill(sheet *spreadsheet.Sheet, rowStart, rows, colStart, cols int) {
 	values := make([][]*spreadsheet.Cell, rows)
 	for i := rowStart; i < rowStart+rows; i++ {
 		rowValues := make([]*spreadsheet.Cell, cols)
@@ -28,5 +29,5 @@ func (c Container) Fill(sheet *spreadsheet.Sheet, rowStart, rows, colStart, cols
 		}
 		values[i-2] = rowValues
 	}
-	c = values
+	*c = values
 }

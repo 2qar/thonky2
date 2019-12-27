@@ -54,7 +54,7 @@ func (s *Schedule) Update() error {
 	if err != nil {
 		return fmt.Errorf("error getting players: %s", err)
 	}
-	err = s.getWeek()
+	err = s.getWeek("Weekly Schedule")
 	if err != nil {
 		return fmt.Errorf("error getting week: %s", err)
 	}
@@ -142,15 +142,19 @@ func (s *Schedule) getPlayers() error {
 }
 
 // getWeek parses the week schedule.
-func (s *Schedule) getWeek() error {
-	sheet, err := s.SheetByTitle("Weekly Schedule")
+func (s *Schedule) getWeek(sheetName string) error {
+	sheet, err := s.SheetByTitle(sheetName)
 	if err != nil {
 		return err
 	}
 
 	s.Week.Date = strings.Split(sheet.Rows[2][1].Value, ", ")[1]
-	// TODO: replace 6 with however many blocks there are on the schedule
-	s.Week.Fill(sheet, 2, 7, 2, 6)
+	var blocks int
+	// TODO: check value against valid activities instead of a blank cell
+	//       or just count the ranges at the top
+	for blocks = 0; sheet.Rows[2][blocks+2].Value != ""; blocks++ {
+	}
+	s.Week.Fill(sheet, 2, 7, 2, blocks)
 	for i := 2; i < 9; i++ {
 		s.Week.Days[i-2] = sheet.Rows[i][1].Value
 	}

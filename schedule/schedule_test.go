@@ -82,5 +82,27 @@ func TestSchedulePlayers(t *testing.T) {
 			break
 		}
 	}
+
 	verifyContainer(&p.Container, availability, t)
+}
+
+func TestScheduleFlexible(t *testing.T) {
+	week := [][]string{
+		{"Free", "Free", "Free"},
+		{"Free", "Free", "Free"},
+		{"Free", "Free", "Free"},
+		{"Scrim", "Scrim", "Free"},
+		{"Scrim", "Scrim", "Free"},
+		{"Scrim", "Scrim", "Free"},
+		{"Scrim", "Scrim", "Free"},
+	}
+
+	err := schedule.getWeek("SheetRaw")
+	if err != nil {
+		t.Fatalf("%s\n", err)
+	}
+	verifyContainer(&schedule.Week.Container, week, t)
+	if len(schedule.Week.Container[0]) != 3 {
+		t.Fatalf("wrong amount of activities parsed: %d != 3", len(schedule.Week.Container[0]))
+	}
 }
