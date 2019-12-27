@@ -30,8 +30,10 @@ func logEmbed(e *discordgo.MessageEmbed) {
 func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	// TODO: add a team command that does this check before running the command and passes the team
 	team := FindTeam(m.GuildID, m.ChannelID)
-	if team == nil || !team.DocKey.Valid {
+	if team == nil {
 		return "No config for this guild.", nil
+	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
+		return "No spreadsheet for this team.", nil
 	}
 	sched := team.Schedule()
 

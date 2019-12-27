@@ -14,8 +14,8 @@ func Update(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (st
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
-	} else if !team.DocKey.Valid {
-		return "No doc key for this guild.", nil
+	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
+		return "No spreadsheet for this team.", nil
 	}
 	sched := team.Schedule()
 

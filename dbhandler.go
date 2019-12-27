@@ -51,9 +51,7 @@ func (d *Handler) AddTeam(guildID, name, channel string) error {
 	t.GuildID = guildID
 	t.Name = sql.NullString{String: name, Valid: true}
 	t.Channels = pq.StringArray([]string{channel})
-	_, err = d.Query(`INSERT INTO teams
-	(server_id, team_name, channels, remind_activities, remind_intervals, update_interval)
-	VALUES ($1, $2, $3, $4, $5, $6)`, t.GuildID, t.Name, t.Channels, t.RemindActivities, t.RemindIntervals, t.UpdateInterval)
+	_, err = d.Query("INSERT INTO teams (server_id, team_name, channels) VALUES ($1, $2, $3)", t.GuildID, t.Name, t.Channels)
 	return err
 }
 
@@ -134,5 +132,17 @@ func (d *Handler) CachedSchedule(s *schedule.Schedule) (err error) {
 		activities = strings.ReplaceAll(activities, p, "")
 	}
 	s.ValidActivities = strings.Split(activities, ",")
+	return
+}
+
+// SpreadsheetID returns the spreadsheet ID for the team with the given ID.
+func (d *Handler) SpreadsheetID(teamID int) (id string, err error) {
+	err = d.QueryRow("SELECT spreadsheet_id FROM schedules WHERE team = $1", teamID).Scan(&id)
+	return
+}
+
+// ReminderConfig returns the reminder config for a team.
+func (d *Handler) ReminderConfig(teamID int) (r ReminderConfig, err error) {
+	err = d.Select(&r, "SELECT * FROM schedules WHERE team = $1", teamID)
 	return
 }
