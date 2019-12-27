@@ -149,10 +149,20 @@ func (s *Schedule) getWeek(sheetName string) error {
 	}
 
 	s.Week.Date = strings.Split(sheet.Rows[2][1].Value, ", ")[1]
+
 	var blocks int
-	// TODO: check value against valid activities instead of a blank cell
-	//       or just count the ranges at the top
-	for blocks = 0; sheet.Rows[2][blocks+2].Value != ""; blocks++ {
+	for {
+		valid := false
+		for _, activity := range s.ValidActivities {
+			if sheet.Rows[2][blocks+2].Value == activity {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			break
+		}
+		blocks++
 	}
 	s.Week.Fill(sheet, 2, 7, 2, blocks)
 	for i := 2; i < 9; i++ {
