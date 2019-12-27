@@ -61,7 +61,7 @@ func (r reminderCheck) Run() {
 }
 
 func addReminder(time int, s *discordgo.Session) error {
-	return scheduler.AddJob(fmt.Sprintf("0 %d 13-24 * * *", time), reminderCheck{Time: time, Session: s})
+	return scheduler.AddJob(fmt.Sprintf("0 %d 13-23 * * *", time), reminderCheck{Time: time, Session: s})
 }
 
 // StartReminders starts checking for reminders 45 and 15 minutes before each hour
