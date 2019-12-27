@@ -8,12 +8,12 @@ type Player struct {
 }
 
 // Availability returns the availability of a player for a week.
-func (p *Player) Availability() [7][6]string {
+func (p *Player) Availability() [][]string {
 	return p.Values()
 }
 
 // AvailabilityOn returns the availability of a player on a day.
-func (p *Player) AvailabilityOn(day int) [6]string {
+func (p *Player) AvailabilityOn(day int) []string {
 	return p.Availability()[day]
 }
 

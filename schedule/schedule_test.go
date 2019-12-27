@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func verifyContainer(v *Container, data *[7][6]string, t *testing.T) {
+func verifyContainer(v *Container, data [][]string, t *testing.T) {
 	for i, row := range v.Values() {
 		for j, value := range row {
 			if value != data[i][j] {
@@ -54,7 +54,7 @@ func verifyContainer(v *Container, data *[7][6]string, t *testing.T) {
 }
 
 func TestScheduleWeek(t *testing.T) {
-	week := [7][6]string{
+	week := [][]string{
 		{"Free", "Scrim", "Scrim", "Scrim", "Scrim", "Free"},
 		{"Free", "Scrim", "Scrim", "Free", "Free", "Free"},
 		{"Free", "Scrim", "Scrim", "Free", "Free", "Free"},
@@ -63,11 +63,11 @@ func TestScheduleWeek(t *testing.T) {
 		{"Free", "Free", "Free", "Free", "Free", "Free"},
 		{"Free", "Free", "Free", "Free", "Free", "Free"},
 	}
-	verifyContainer(&schedule.Week.Container, &week, t)
+	verifyContainer(&schedule.Week.Container, week, t)
 }
 
 func TestSchedulePlayers(t *testing.T) {
-	availability := [7][6]string{
+	availability := [][]string{
 		{"Maybe", "Yes", "Yes", "Yes", "Yes", "No"},
 		{"Maybe", "Yes", "Yes", "No", "Yes", "Maybe"},
 		{"No", "Maybe", "Yes", "Yes", "No", "Maybe"},
@@ -82,5 +82,5 @@ func TestSchedulePlayers(t *testing.T) {
 			break
 		}
 	}
-	verifyContainer(&p.Container, &availability, t)
+	verifyContainer(&p.Container, availability, t)
 }

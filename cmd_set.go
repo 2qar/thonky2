@@ -213,53 +213,34 @@ func updateNote(sheet *spreadsheet.Sheet, cell *spreadsheet.Cell, val string) {
 	}
 }
 
-func tryUpdate(sheet *spreadsheet.Sheet, cells [6]*spreadsheet.Cell, startTime, valueStart int, args, validArgs []string, updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)) error {
-	var updateCells []*spreadsheet.Cell
-	var parsed []string
-	var err error
+func tryUpdate(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, startTime, valueStart int, args, validArgs []string, updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)) error {
+	parseStart := valueStart
 	if match, _ := regexp.MatchString(`\d{1,2}-\d{1,2}`, args[valueStart]); match {
 		rangeStart, rangeEnd, err := getTimeRange(args[valueStart], startTime)
 		if err != nil {
 			return err
 		}
 		if rangeStart == rangeEnd {
-			updateCells = []*spreadsheet.Cell{cells[rangeStart]}
+			cells = cells[rangeStart : rangeStart+1]
 		} else {
-			updateCells = cells[rangeStart:rangeEnd]
+			cells = cells[rangeStart:rangeEnd]
 		}
 
-		parsed, err = parseArgs(args[valueStart+1:], validArgs)
-		if err != nil {
-			return err
-		} else if len(updateCells) != len(parsed) && len(parsed) != 1 {
-			return fmt.Errorf("Invalid amount of activities for this range: %d cells =/= %d responses", len(updateCells), len(parsed))
-		}
+		valueStart++
 	} else if i, err := strconv.Atoi(args[valueStart]); err == nil {
 		if i < startTime {
 			return fmt.Errorf("Invalid time: %d < %d", i, startTime)
 		}
-		parsed, err = parseArgs(args[valueStart+1:], validArgs)
-		if err != nil {
-			return err
-		} else if len(parsed) != 1 {
-			return fmt.Errorf("Too many arguments: %d != 1", len(parsed))
-		}
-
-		updateCells[0] = cells[i-4]
-	} else {
-		parsed, err = parseArgs(args[valueStart:], validArgs)
-		if err != nil {
-			return err
-		} else if len(parsed) != 1 {
-			return fmt.Errorf("Too many arguments: %d =/= 1", len(parsed))
-		}
-
-		for _, cell := range cells {
-			updateCells = append(updateCells, cell)
-		}
+		cells = cells[i-startTime : i-startTime+1]
 	}
-	update(sheet, updateCells, parsed, updater)
-	return err
+	parsed, err := parseArgs(args[parseStart:], validArgs)
+	if err != nil {
+		return err
+	} else if len(cells) != len(parsed) {
+		return fmt.Errorf("cell count != parsed count (%d cells != %d parsed arguments)", len(cells), len(parsed))
+	}
+	update(sheet, cells, parsed, updater)
+	return nil
 }
 
 func getTimeRange(timeStr string, startTime int) (int, int, error) {

@@ -39,7 +39,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 		switch args[1] {
 		case "week":
 			log.Println("getting week")
-			if sched.Week == (schedule.Week{}) {
+			if sched.Week.Container == nil {
 				return "No week schedule, something broke", nil
 			}
 			embed := formatWeek(s, &sched.Week, team.SheetLink())
@@ -51,7 +51,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 			log.Println("sent week :)")
 		case "today":
 			log.Println("getting today")
-			if sched.Week == (schedule.Week{}) {
+			if sched.Week.Container == nil {
 				return "No week schedule, something broke", nil
 			} else if sched.Players == nil {
 				return "No players, something broke", nil

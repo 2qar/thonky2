@@ -3,26 +3,30 @@ package schedule
 import "github.com/bigheadgeorge/spreadsheet"
 
 // Container stores cells in a format that fits each activity time every day.
-type Container [7][6]*spreadsheet.Cell
+type Container [][]*spreadsheet.Cell
 
 // Values returns the string values of each cell
-func (c *Container) Values() [7][6]string {
-	var values [7][6]string
+func (c Container) Values() [][]string {
+	values := make([][]string, len(c))
 	for i, row := range c {
+		rowValues := make([]string, len(c[0]))
 		for j, cell := range row {
-			values[i][j] = cell.Value
+			rowValues[j] = cell.Value
 		}
+		values[i] = rowValues
 	}
 	return values
 }
 
 // Fill fills a cell container with cells on a sheet starting at a given row and column.
-func (c *Container) Fill(sheet *spreadsheet.Sheet, row, col int) {
-	rowMax := row + 7
-	colMax := col + 6
-	for i := row; i < rowMax; i++ {
-		for j := col; j < colMax; j++ {
-			c[i-2][j-2] = &sheet.Rows[i][j]
+func (c Container) Fill(sheet *spreadsheet.Sheet, rowStart, rows, colStart, cols int) {
+	values := make([][]*spreadsheet.Cell, rows)
+	for i := rowStart; i < rowStart+rows; i++ {
+		rowValues := make([]*spreadsheet.Cell, cols)
+		for j := colStart; j < colStart+cols; j++ {
+			rowValues[j-2] = &sheet.Rows[i][j]
 		}
+		values[i-2] = rowValues
 	}
+	c = values
 }

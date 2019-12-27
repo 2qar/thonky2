@@ -123,7 +123,7 @@ func (s *Schedule) getPlayers() error {
 					Name: name,
 					Role: role,
 				}
-				player.Fill(sheet, 2, 2)
+				player.Fill(sheet, 2, 7, 2, 6)
 				pCh <- player
 			}(name, currentRole)
 			continue
@@ -149,7 +149,8 @@ func (s *Schedule) getWeek() error {
 	}
 
 	s.Week.Date = strings.Split(sheet.Rows[2][1].Value, ", ")[1]
-	s.Week.Fill(sheet, 2, 2)
+	// TODO: replace 6 with however many blocks there are on the schedule
+	s.Week.Fill(sheet, 2, 7, 2, 6)
 	for i := 2; i < 9; i++ {
 		s.Week.Days[i-2] = sheet.Rows[i][1].Value
 	}

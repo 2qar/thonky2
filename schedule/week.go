@@ -16,7 +16,7 @@ type Week struct {
 }
 
 // ActivitiesOn returns the activities for a given day.
-func (w *Week) ActivitiesOn(day int) [6]string {
+func (w *Week) ActivitiesOn(day int) []string {
 	return w.Values()[day]
 }
 
