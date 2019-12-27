@@ -115,8 +115,8 @@ func ready(s *discordgo.Session, r *discordgo.Ready) {
 			if err != nil {
 				log.Println(err)
 			}
+			log.Printf("added config for team %q in %s\n", team.Name, guild.ID)
 		}
-		log.Println("added config for", guild.ID)
 	}
 }
 

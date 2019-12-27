@@ -101,7 +101,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return "No config for this guild.", nil
 	}
 
-	if team.Name.String == "" {
+	if team.Guild() {
 		return "No team in this channel.", nil
 	}
 
@@ -110,7 +110,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		if !isChannel(arg) {
 			return fmt.Sprintf("Invalid channel %q.", arg), nil
 		} else if name, err := DB.GetName(channelID(arg)); err == nil {
-			if name == team.Name.String {
+			if name == team.Name {
 				return arg + " already added.", nil
 			} else {
 				return fmt.Sprintf("%s already occupied by %q.", arg, name), nil

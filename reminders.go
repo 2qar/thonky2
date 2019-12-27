@@ -47,8 +47,8 @@ func (r reminderCheck) Run() {
 							r.Session.ChannelMessageSend(team.AnnounceChannel.String, announcement)
 
 							announceLog := fmt.Sprintf("send announcement for %q in [%s]", activity, team.GuildID)
-							if team.Name.Valid {
-								announceLog += fmt.Sprintf("for %q", team.Name.String)
+							if !team.Guild() {
+								announceLog += fmt.Sprintf("for %q", team.Name)
 							}
 							log.Println(announceLog)
 							break
