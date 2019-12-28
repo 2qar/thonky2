@@ -35,8 +35,8 @@ type ODInfo struct {
 	Players []Player
 }
 
-// OD grabs information about another team.
-func OD(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *discordgo.MessageEmbed) (string, error) {
+// getTeamStats gets the SR of every player on a team found with the given search and match methods.
+func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *discordgo.MessageEmbed) (string, error) {
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
@@ -47,7 +47,7 @@ func OD(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *disco
 	var msg string
 	var odi ODInfo
 
-	teamName := m.Content[4:]
+	teamName := m.Content[strings.Index(m.Content, " ")+1:]
 	num, err := strconv.Atoi(teamName)
 	if err != nil {
 		msg, err = search(team.ID, teamName, &odi)
@@ -58,7 +58,7 @@ func OD(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *disco
 		return msg, err
 	}
 
-	embed = formatTeam(odi.Team, convertPlayers(odi.Players))
+	*embed = formatTeam(odi.Team, convertPlayers(odi.Players))
 	return "", nil
 }
 
@@ -114,7 +114,7 @@ func formatNames(names []string) string {
 }
 
 // formatTeam formats a team and it's players into a fancy embed
-func formatTeam(odt ODTeam, players []goverbuff.Player) *discordgo.MessageEmbed {
+func formatTeam(odt ODTeam, players []goverbuff.Player) discordgo.MessageEmbed {
 	roleEmotes := map[string]string{
 		"Defense": ":crossed_swords:",
 		"Offense": ":crossed_swords:",
@@ -122,7 +122,7 @@ func formatTeam(odt ODTeam, players []goverbuff.Player) *discordgo.MessageEmbed 
 		"Support": ":ambulance:",
 	}
 
-	embed := &discordgo.MessageEmbed{
+	embed := discordgo.MessageEmbed{
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: odt.Logo(),
 		},

@@ -22,7 +22,7 @@ func init() {
 // Battlefy gets team information from Battlefy.
 func Battlefy(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	var embed discordgo.MessageEmbed
-	msg, err := OD(m, searchBattlefy, matchBattlefy, &embed)
+	msg, err := getTeamStats(m, searchBattlefy, matchBattlefy, &embed)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}

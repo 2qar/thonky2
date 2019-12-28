@@ -23,7 +23,7 @@ func init() {
 // Gamebattles gets team information off of gamebattles.
 func Gamebattles(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
 	var embed discordgo.MessageEmbed
-	msg, err := OD(m, searchGamebattles, matchBattlefy, &embed)
+	msg, err := getTeamStats(m, searchGamebattles, matchBattlefy, &embed)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}
@@ -66,6 +66,8 @@ func searchGamebattles(team_id int, name string, odi *ODInfo) (string, error) {
 			names = append(names, team.TeamName)
 		}
 		return formatNames(names), nil
+	} else if len(foundTeams) == 0 {
+		return fmt.Sprintf("No teams in the tournament have %q in their name.", name), nil
 	}
 
 	// pepega Xd
