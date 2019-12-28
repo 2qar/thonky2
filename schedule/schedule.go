@@ -54,6 +54,12 @@ func (s *Schedule) Update() error {
 	if err != nil {
 		return fmt.Errorf("error getting players: %s", err)
 	}
+
+	s.ValidActivities, err = validActivities(s.client, s.ID)
+	if err != nil {
+		return fmt.Errorf("error getting valid activities: %s", err)
+	}
+
 	err = s.getWeek("Weekly Schedule")
 	if err != nil {
 		return fmt.Errorf("error getting week: %s", err)
@@ -65,10 +71,6 @@ func (s *Schedule) Update() error {
 		if err != nil {
 			return fmt.Errorf("error getting last modified: %s", err)
 		}
-	}
-	s.ValidActivities, err = validActivities(s.client, s.ID)
-	if err != nil {
-		return fmt.Errorf("error getting valid activities: %s", err)
 	}
 
 	return s.service.ReloadSpreadsheet(s.Spreadsheet)
@@ -169,12 +171,17 @@ func (s *Schedule) getWeek(sheetName string) error {
 		s.Week.Days[i-2] = sheet.Rows[i][1].Value
 	}
 
-	startStr := strings.Split(sheet.Rows[1][2].Value, "-")[0]
-	startTime, err := strconv.Atoi(startStr)
+	blockRange := strings.Split(sheet.Rows[1][2].Value, "-")
+	s.Week.StartTime, err = strconv.Atoi(blockRange[0])
 	if err != nil {
 		return err
 	}
-	s.Week.StartTime = startTime
+
+	blockEnd, err := strconv.Atoi(blockRange[1])
+	if err != nil {
+		return err
+	}
+	s.Week.BlockLength = blockEnd - s.Week.StartTime
 
 	return err
 }
