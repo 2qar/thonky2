@@ -65,7 +65,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 		case "unscheduled":
 			log.Println("getting unscheduled")
 			embed := baseEmbed("Open Scrims", team.SheetLink())
-			addTimeField(embed, "Times", sched.Week.StartTime)
+			addTimeField(embed, "Times", &sched.Week)
 
 			today := sched.Week.Today()
 			activities := sched.Week.Values()
@@ -113,19 +113,19 @@ func baseEmbed(title, sheetLink string) *discordgo.MessageEmbed {
 }
 
 // addTimeField adds a field to the given embed with time emotes
-func addTimeField(e *discordgo.MessageEmbed, title string, startTime int) {
+func addTimeField(e *discordgo.MessageEmbed, title string, week *schedule.Week) {
 	var timeString string
-	for i := 0; i < 5; i++ {
-		timeString += timeEmotes[i+startTime] + ", "
+	for i := 0; i < len(week.Container[0])-1; i++ {
+		timeString += timeEmotes[week.StartTime+(i*week.BlockLength)] + ", "
 	}
-	timeString += timeEmotes[5+startTime]
+	timeString += timeEmotes[week.StartTime+(len(week.Container[0])-1)*week.BlockLength]
 	e.Fields = append(e.Fields, &discordgo.MessageEmbedField{Name: title, Value: timeString})
 }
 
 // formatWeek formats week information into a Discord embed
 func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *discordgo.MessageEmbed {
 	embed := baseEmbed("Week of "+w.Date, sheetLink)
-	addTimeField(embed, "Times", w.StartTime)
+	addTimeField(embed, "Times", w)
 	emojiGuild, err := s.Guild("437847669839495168")
 	if err != nil {
 		return embed
@@ -136,7 +136,7 @@ func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *disco
 	for i := 0; i < 7; i++ {
 		var activityEmojis []string
 		currDay := (i + today) % 7
-		for j := 0; j < 6; j++ {
+		for j := 0; j < len(days[0]); j++ {
 			activity := days[currDay][j]
 			if activity == "" || activity == "TBD" {
 				activityEmojis = append(activityEmojis, ":grey_question:")
@@ -169,7 +169,7 @@ func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *disco
 
 func formatDay(s *discordgo.Session, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
-	addTimeField(embed, "Players", w.StartTime)
+	addTimeField(embed, "Players", w)
 
 	roleEmoji := func(role string) string {
 		switch role {
