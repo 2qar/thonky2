@@ -12,14 +12,15 @@ import (
 )
 
 // searchOD searches the participants in a tournament for the given name.
-type searchOD func(int, string, *ODInfo) (string, error)
+type searchOD func(int, string, *TeamStats) (string, error)
 
 // matchOD gets stats for the opposing team in a given round in a tournament.
-type matchOD func(int, int, *ODInfo) (string, error)
+type matchOD func(int, int, *TeamStats) (string, error)
 
 // Player has methods for getting information about a player.
 type Player interface {
 	Battletag() string
+	Active() bool
 }
 
 // ODTeam has methods for getting team info.
@@ -29,14 +30,14 @@ type ODTeam interface {
 	Link() string
 }
 
-// ODInfo glues a ODTeam and []Player together
-type ODInfo struct {
+// TeamStats glues a ODTeam and []Player together
+type TeamStats struct {
 	Team    ODTeam
 	Players []Player
 }
 
 // getTeamStats gets the SR of every player on a team found with the given search and match methods.
-func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, embed *discordgo.MessageEmbed) (string, error) {
+func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, teamStats *TeamStats) (string, error) {
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
@@ -45,21 +46,15 @@ func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, em
 	}
 
 	var msg string
-	var odi ODInfo
 
 	teamName := m.Content[strings.Index(m.Content, " ")+1:]
 	num, err := strconv.Atoi(teamName)
 	if err != nil {
-		msg, err = search(team.ID, teamName, &odi)
+		msg, err = search(team.ID, teamName, teamStats)
 	} else {
-		msg, err = match(team.ID, num, &odi)
+		msg, err = match(team.ID, num, teamStats)
 	}
-	if len(msg) > 0 || err != nil {
-		return msg, err
-	}
-
-	*embed = formatTeam(odi.Team, convertPlayers(odi.Players))
-	return "", nil
+	return msg, err
 }
 
 // convertPlayers takes a list of generic players and gets their overbuff stats
@@ -113,8 +108,8 @@ func formatNames(names []string) string {
 	return nameStr
 }
 
-// formatTeam formats a team and it's players into a fancy embed
-func formatTeam(odt ODTeam, players []goverbuff.Player) discordgo.MessageEmbed {
+// formatTeamStats formats a team and it's players into a fancy embed
+func formatTeamStats(odt ODTeam, players []goverbuff.Player) discordgo.MessageEmbed {
 	roleEmotes := map[string]string{
 		"Defense": ":crossed_swords:",
 		"Offense": ":crossed_swords:",
@@ -150,17 +145,6 @@ func formatTeam(odt ODTeam, players []goverbuff.Player) discordgo.MessageEmbed {
 			sr = fmt.Sprintf("%d", player.SR)
 		}
 
-		// TODO: split gamebattles and battlefy into their own commands to re-implement bolding active team members
-		/*
-			var name string
-			if player.Active() {
-				name = fmt.Sprintf("**%s**", player.BTag)
-			} else {
-				name = player.BTag
-			}
-		*/
-
-		//playerString += fmt.Sprintf("%s %s: %s\n", emote, name, sr)
 		playerString += fmt.Sprintf("%s %s: %s\n", emote, player.BTag, sr)
 	}
 

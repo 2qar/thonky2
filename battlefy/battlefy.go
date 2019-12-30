@@ -20,7 +20,7 @@ func FindTeam(tournamentID, name string, t *Team) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	var teams []teamData
+	var teams []Team
 	err = json.NewDecoder(resp.Body).Decode(&teams)
 	if err != nil {
 		return []string{}, err
@@ -28,103 +28,89 @@ func FindTeam(tournamentID, name string, t *Team) ([]string, error) {
 	if len(teams) == 0 {
 		return []string{}, fmt.Errorf("unable to find team \"%s\"", name)
 	} else if len(teams) == 1 {
-		team, err := getTeam(teams[0])
-		if err != nil {
-			return []string{}, err
-		}
-		*t = team
-		return []string{team.Name()}, nil
+		teams[0].link = "https://battlefy.com/teams/" + teams[0].PersistentTeam.ID
+		markActivePlayers(&teams[0])
+		*t = teams[0]
+		return []string{teams[0].Name()}, nil
 	} else {
 		names := []string{}
 		for _, team := range teams {
-			names = append(names, team.Name)
+			names = append(names, team.PersistentTeam.Name)
 		}
 		return names, nil
 	}
 }
 
 // GetOtherTeam get information on the enemy team in a round of Open Division
-func GetOtherTeam(tournamentLink, teamID string, round int) (e Team, err error) {
+func GetOtherTeam(tournamentLink, teamID string, round int) (Team, error) {
 	cutIndex := strings.LastIndex(tournamentLink, "/") + 1
 	stageID := tournamentLink[cutIndex:]
 
 	m, err := getMatch(stageID, teamID, round)
 	if err != nil {
-		return
+		return Team{}, err
 	}
 
-	e, err = getTeam(m.Team().Info)
-	if err != nil {
-		return
-	}
-
-	e.setLink(tournamentLink + "/match/" + m.ID)
-	return
+	team := m.Team()
+	team.Team.link = tournamentLink + "/match/" + m.ID
+	markActivePlayers(&team.Team)
+	return team.Team, nil
 }
 
-func getTeam(t teamData) (Team, error) {
-	resp, err := http.Get(cloudfront + "persistent-teams/" + t.PID)
-	if err != nil {
-		return Team{}, err
-	}
-	defer resp.Body.Close()
-
-	var pts [1]persistentTeam
-	err = json.NewDecoder(resp.Body).Decode(&pts)
-	if err != nil {
-		return Team{}, err
-	}
-	pt := pts[0]
-
-	ids := t.ActiveIDS
-	for _, p := range t.Players {
-		for i, id := range ids {
-			if id == p.ID {
-				ids = append(ids[:i], ids[i+1:]...)
-				p.active = true
-			}
-		}
-	}
-
-	return Team{
-		link:    "https://www.battlefy.com/teams/" + t.PID,
-		name:    pt.Name,
-		logo:    pt.Logo,
-		Players: append([]Player{pt.Captain}, t.Players[:]...)}, nil
+type matchTeam struct {
+	Team Team `json:"team"`
 }
 
 type match struct {
-	ID     string `json:"_id"`
-	Top    team   `json:"top"`
-	Bottom team   `json:"bottom"`
+	ID     string    `json:"_id"`
+	Top    matchTeam `json:"top"`
+	Bottom matchTeam `json:"bottom"`
 	isTop  bool
 }
 
-func (m *match) Team() team {
+func (m *match) Team() matchTeam {
 	if m.isTop {
 		return m.Top
 	}
 	return m.Bottom
 }
 
-type team struct {
-	ID             string         `json:"teamID"`
-	Info           teamData       `json:"team"`
-	PersistentTeam persistentTeam `json:"persistentTeam"`
+// Team stores a bunch of team metadata.
+type Team struct {
+	Players        []Player `json:"players"`
+	PersistentTeam struct {
+		ID                  string   `json:"_id"`
+		Name                string   `json:"name"`
+		Logo                string   `json:"logoUrl"`
+		PersistentPlayerIDs []string `json:"persistentPlayerIDs"`
+		PersistentCaptainID string   `json:"persistentCaptainID"`
+	} `json:"persistentTeam"`
+	link string
 }
 
-type teamData struct {
-	Name      string   `json:"name"`
-	ActiveIDS []string `json:"playerIDs"`
-	PID       string   `json:"persistentTeamID"`
-	Players   []Player `json:"players"`
+func (t Team) Name() string {
+	return t.PersistentTeam.Name
 }
 
-type persistentTeam struct {
-	Name    string   `json:"name"`
-	Logo    string   `json:"logoUrl"`
-	Captain Player   `json:"persistentCaptain"`
-	Players []Player `json:"persistentPlayers"`
+func (t Team) Link() string {
+	return t.link
+}
+
+func (t Team) Logo() string {
+	return t.PersistentTeam.Logo
+}
+
+func markActivePlayers(t *Team) {
+	ids := append(t.PersistentTeam.PersistentPlayerIDs, t.PersistentTeam.PersistentCaptainID)
+	for p := range t.Players {
+		for i, id := range ids {
+			if id == t.Players[p].PID {
+				ids = append(ids[:i], ids[i+1:]...)
+				t.Players[p].active = true
+				break
+			}
+		}
+	}
 }
 
 // Player stores the Battlefy information about a player.
@@ -158,30 +144,6 @@ func (p Player) Active() bool {
 	return p.active
 }
 
-// Team stores info about a team scraped from Battlefy, including stats about their players.
-type Team struct {
-	link    string
-	name    string
-	logo    string
-	Players []Player
-}
-
-func (t Team) Name() string {
-	return t.name
-}
-
-func (t *Team) setLink(link string) {
-	t.link = link
-}
-
-func (t Team) Link() string {
-	return t.link
-}
-
-func (t Team) Logo() string {
-	return t.logo
-}
-
 // Find a match in the given round where a team with the given id is playing
 func getMatch(stageID, teamID string, round int) (match, error) {
 	matchesLink := fmt.Sprintf(cloudfront+"stages/%s/rounds/%d/matches", stageID, round)
@@ -204,12 +166,12 @@ func getMatch(stageID, teamID string, round int) (match, error) {
 		pos        string
 	)
 	for _, m = range matches {
-		if m.Top.Info.PID == teamID {
+		if m.Top.Team.PersistentTeam.ID == teamID {
 			pos = "bottom"
 			m.isTop = false
 			foundMatch = true
 			break
-		} else if m.Bottom.Info.PID == teamID {
+		} else if m.Bottom.Team.PersistentTeam.ID == teamID {
 			pos = "top"
 			m.isTop = true
 			foundMatch = true
@@ -220,7 +182,7 @@ func getMatch(stageID, teamID string, round int) (match, error) {
 		return match{}, errors.New("match not found")
 	}
 
-	matchLink := fmt.Sprintf(cloudfront+"matches/%s?extend[%s.team][players][users]", m.ID, pos)
+	matchLink := fmt.Sprintf(cloudfront+"matches/%s?extend[%s.team][players][users]&extend[%s.team][persistentTeam]", m.ID, pos, pos)
 	resp, err = http.Get(matchLink)
 	if err != nil {
 		return match{}, nil

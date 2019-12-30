@@ -21,21 +21,42 @@ func init() {
 
 // Battlefy gets team information from Battlefy.
 func Battlefy(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	var embed discordgo.MessageEmbed
-	msg, err := getTeamStats(m, searchBattlefy, matchBattlefy, &embed)
+	var teamStats TeamStats
+	msg, err := getTeamStats(m, searchBattlefy, matchBattlefy, &teamStats)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}
 
+	// bold active players
+	players := convertPlayers(teamStats.Players)
+	for _, player := range teamStats.Players {
+		if player.Active() {
+			for o := range players {
+				if player.Battletag() == players[o].BTag {
+					players[o].BTag = "**" + players[o].BTag + "**"
+				}
+			}
+		}
+	}
+
+	embed := formatTeamStats(teamStats.Team, players)
 	embed.Color = 0xe74c3c
 	embed.Author.IconURL = battlefyLogo
-
 	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	return "", nil
 }
 
+// battlefyPlayers converts a slice of battlefy players to a slice of generic players.
+func battlefyPlayers(players []battlefy.Player) []Player {
+	genericPlayers := make([]Player, len(players))
+	for i := range players {
+		genericPlayers[i] = players[i]
+	}
+	return genericPlayers
+}
+
 // searchBattlefy populates the given []Player and ODTeam with Battlefy search results.
-func searchBattlefy(team_id int, name string, odi *ODInfo) (string, error) {
+func searchBattlefy(team_id int, name string, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
 	err := DB.QueryRow("SELECT tournament_link FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink)
 	if err != nil {
@@ -55,16 +76,13 @@ func searchBattlefy(team_id int, name string, odi *ODInfo) (string, error) {
 		return formatNames(names), nil
 	}
 
-	odi.Team = team
-	odi.Players = make([]Player, len(team.Players))
-	for i := range team.Players {
-		odi.Players[i] = team.Players[i]
-	}
+	teamStats.Team = team
+	teamStats.Players = battlefyPlayers(team.Players)
 	return "", nil
 }
 
 // matchBattlefy gets stats on the opposing team in the given round of the tournament.
-func matchBattlefy(team_id int, round int, odi *ODInfo) (string, error) {
+func matchBattlefy(team_id int, round int, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
 	var teamID string
 	err := DB.QueryRow("SELECT tournament_link, team_id FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink, &teamID)
@@ -79,10 +97,7 @@ func matchBattlefy(team_id int, round int, odi *ODInfo) (string, error) {
 		return fmt.Sprintf("Error grabbing team info from Battlefy: %s", err), err
 	}
 
-	odi.Team = t
-	odi.Players = make([]Player, len(t.Players))
-	for i := range t.Players {
-		odi.Players[i] = t.Players[i]
-	}
+	teamStats.Team = t
+	teamStats.Players = battlefyPlayers(t.Players)
 	return "", nil
 }

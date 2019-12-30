@@ -22,19 +22,29 @@ func init() {
 
 // Gamebattles gets team information off of gamebattles.
 func Gamebattles(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	var embed discordgo.MessageEmbed
-	msg, err := getTeamStats(m, searchGamebattles, matchBattlefy, &embed)
+	var teamStats TeamStats
+	msg, err := getTeamStats(m, searchGamebattles, matchBattlefy, &teamStats)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}
 
+	embed := formatTeamStats(teamStats.Team, convertPlayers(teamStats.Players))
 	embed.Color = 0x22242C
 	embed.Author.IconURL = gamebattlesLogo
 	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	return "", nil
 }
 
-func searchGamebattles(team_id int, name string, odi *ODInfo) (string, error) {
+// gamebattlesPlayers converts a slice of gamebattles players to a slice of generic players.
+func gamebattlesPlayers(players []gamebattles.Player) []Player {
+	genericPlayers := make([]Player, len(players))
+	for i := range players {
+		genericPlayers[i] = players[i]
+	}
+	return genericPlayers
+}
+
+func searchGamebattles(team_id int, name string, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
 	err := DB.QueryRow("SELECT tournament_link FROM gamebattles WHERE team = $1", team_id).Scan(&tournamentLink)
 	if err != nil {
@@ -75,16 +85,13 @@ func searchGamebattles(team_id int, name string, odi *ODInfo) (string, error) {
 	if err != nil {
 		return fmt.Sprintf("Error grabbing players for team %s: %s", foundTeams[0].Name(), err), err
 	}
-	odi.Team = foundTeam
-	odi.Players = make([]Player, len(foundTeam.Players))
-	for i := range foundTeam.Players {
-		odi.Players[i] = foundTeam.Players[i]
-	}
+	teamStats.Team = foundTeam
+	teamStats.Players = gamebattlesPlayers(foundTeam.Players)
 
 	return "", nil
 }
 
-func matchGamebattles(team, round int, odi *ODInfo) (string, error) {
+func matchGamebattles(team, round int, teamStats *TeamStats) (string, error) {
 	// TODO: figure out how the rounds api stuff works on gamebattles
 	//       https://gamebattles.majorleaguegaming.com/pc/overwatch/tournament/Breakable-Barriers-NA-1/bracket
 	return "i haven't actually done this part yet", nil
