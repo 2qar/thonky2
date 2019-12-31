@@ -5,7 +5,9 @@ import (
 )
 
 const (
-	tournamentID = "5d6fdb02c747ff732da36eb4"
+	tournamentID   = "5d6fdb02c747ff732da36eb4"
+	tournamentLink = "https://battlefy.com/overwatch-open-division-north-america/2019-overwatch-open-division-practice-season-north-america/5d6fdb02c747ff732da36eb4/stage/5d7b716bb7758c268b771f83"
+	teamID         = "5bfe1b9418ddd9114f14efb0"
 )
 
 func TestFindTeam(t *testing.T) {
@@ -20,6 +22,18 @@ func TestFindTeam(t *testing.T) {
 
 	for _, player := range team.Players {
 		t.Logf("%+v\n", player)
+	}
+}
+
+func TestFindMatch(t *testing.T) {
+	team, err := FindMatch(tournamentLink, teamID, 1)
+	if err != nil {
+		t.Fatalf("error finding match: %s\n", err.Error())
+	} else if len(team.PersistentTeam.Name) == 0 {
+		t.Logf("%+v\n", team)
+		t.Fatalf("empty team!\n")
+	} else if team.PersistentTeam.Name != "Event Horizon" {
+		t.Fatalf("name mismatch: %s != Event Horizon", team.PersistentTeam.Name)
 	}
 }
 

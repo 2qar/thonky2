@@ -92,7 +92,7 @@ func matchBattlefy(team_id int, round int, teamStats *TeamStats) (string, error)
 		}
 		return fmt.Sprintf("Error getting Battlefy config: %s", err), err
 	}
-	t, err := battlefy.GetOtherTeam(tournamentLink, teamID, round)
+	t, err := battlefy.FindMatch(tournamentLink, teamID, round)
 	if err != nil {
 		return fmt.Sprintf("Error grabbing team info from Battlefy: %s", err), err
 	}

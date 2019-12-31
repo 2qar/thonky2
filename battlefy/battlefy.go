@@ -28,7 +28,7 @@ func FindTeam(tournamentID, name string, t *Team) ([]string, error) {
 	if len(teams) == 0 {
 		return []string{}, fmt.Errorf("unable to find team \"%s\"", name)
 	} else if len(teams) == 1 {
-		teams[0].link = "https://battlefy.com/teams/" + teams[0].PersistentTeam.ID
+		teams[0].link = "https://battlefy.com/teams/" + teams[0].PersistentTeamID
 		markActivePlayers(&teams[0])
 		*t = teams[0]
 		return []string{teams[0].Name()}, nil
@@ -41,12 +41,12 @@ func FindTeam(tournamentID, name string, t *Team) ([]string, error) {
 	}
 }
 
-// GetOtherTeam get information on the enemy team in a round of Open Division
-func GetOtherTeam(tournamentLink, teamID string, round int) (Team, error) {
+// FindMatch gets info on the opposing team in the given round
+func FindMatch(tournamentLink, teamID string, round int) (Team, error) {
 	cutIndex := strings.LastIndex(tournamentLink, "/") + 1
 	stageID := tournamentLink[cutIndex:]
 
-	m, err := getMatch(stageID, teamID, round)
+	m, err := findMatch(stageID, teamID, round)
 	if err != nil {
 		return Team{}, err
 	}
@@ -61,6 +61,8 @@ type matchTeam struct {
 	Team Team `json:"team"`
 }
 
+// FIXME: something is fucky in findMatch() because the test is failing
+//        https://dtmwra1jsgyb0.cloudfront.net/stages/5d7b716bb7758c268b771f83/rounds/3/matches
 type match struct {
 	ID     string    `json:"_id"`
 	Top    matchTeam `json:"top"`
@@ -77,9 +79,9 @@ func (m *match) Team() matchTeam {
 
 // Team stores a bunch of team metadata.
 type Team struct {
-	Players        []Player `json:"players"`
-	PersistentTeam struct {
-		ID                  string   `json:"_id"`
+	Players          []Player `json:"players"`
+	PersistentTeamID string   `json:"persistentTeamID"`
+	PersistentTeam   struct {
 		Name                string   `json:"name"`
 		Logo                string   `json:"logoUrl"`
 		PersistentPlayerIDs []string `json:"persistentPlayerIDs"`
@@ -144,8 +146,8 @@ func (p Player) Active() bool {
 	return p.active
 }
 
-// Find a match in the given round where a team with the given id is playing
-func getMatch(stageID, teamID string, round int) (match, error) {
+// findMatch gets the opposing team in this round's match
+func findMatch(stageID, teamID string, round int) (match, error) {
 	matchesLink := fmt.Sprintf(cloudfront+"stages/%s/rounds/%d/matches", stageID, round)
 
 	resp, err := http.Get(matchesLink)
@@ -164,16 +166,17 @@ func getMatch(stageID, teamID string, round int) (match, error) {
 		foundMatch bool
 		m          match
 		pos        string
+		top        bool
 	)
 	for _, m = range matches {
-		if m.Top.Team.PersistentTeam.ID == teamID {
+		if m.Top.Team.PersistentTeamID == teamID {
 			pos = "bottom"
-			m.isTop = false
+			top = false
 			foundMatch = true
 			break
-		} else if m.Bottom.Team.PersistentTeam.ID == teamID {
+		} else if m.Bottom.Team.PersistentTeamID == teamID {
 			pos = "top"
-			m.isTop = true
+			top = true
 			foundMatch = true
 			break
 		}
@@ -194,5 +197,6 @@ func getMatch(stageID, teamID string, round int) (match, error) {
 		return match{}, err
 	}
 
+	matches[0].isTop = top
 	return matches[0], nil
 }
