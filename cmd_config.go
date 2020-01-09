@@ -200,7 +200,7 @@ func SetTournament(s *discordgo.Session, m *discordgo.MessageCreate, args []stri
 		return "Invalid tournament URL", nil
 	}
 
-	_, err := DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/"):], team.GuildID, team.Name)
+	_, err := DB.Exec("UPDATE teams SET stage_id = $1 WHERE server_id = $2 AND team_name = $3", url[strings.LastIndex(url, "/")+1:], team.GuildID, team.Name)
 	if err != nil {
 		return "Error updating tournament url: " + err.Error(), err
 	}
