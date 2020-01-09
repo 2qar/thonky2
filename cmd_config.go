@@ -104,7 +104,7 @@ func AddChannels(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 		return "No config for this guild.", nil
 	}
 
-	if team.Name == "" {
+	if team.Guild() {
 		return "No team in this channel.", nil
 	}
 
