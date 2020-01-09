@@ -17,23 +17,21 @@ var (
 
 // Team holds the config for a team in a guild.
 type Team struct {
+	ID               int            `db:"id"`
 	GuildID          string         `db:"server_id"`
-	Name             sql.NullString `db:"team_name"`
+	Name             string         `db:"team_name"`
 	Channels         pq.StringArray `db:"channels"`
 	AnnounceChannel  sql.NullString `db:"announce_channel"`
 	DocKey           sql.NullString `db:"doc_key"`
 	RemindActivities pq.StringArray `db:"remind_activities"`
 	RemindIntervals  pq.Int64Array  `db:"remind_intervals"`
 	RoleMention      sql.NullString `db:"role_mention"`
-	TeamID           sql.NullString `db:"team_id"`
 	UpdateInterval   int            `db:"update_interval"`
-	StageID          sql.NullString `db:"stage_id"`
-	TournamentLink   sql.NullString `db:"tournament_link"`
 }
 
 // Guild returns whether this team represents an entire Discord guild or not
 func (t *Team) Guild() bool {
-	return !t.Name.Valid
+	return len(t.Name) == 0
 }
 
 // Schedule returns the schedule for this team, or nil if they haven't configured one
@@ -51,11 +49,11 @@ func (t *Team) SheetLink() string {
 
 func initTeam(team *Team) error {
 	if !team.DocKey.Valid {
-		return fmt.Errorf("err: no dockey for guild [%s] with name \"%s\"", team.GuildID, team.Name.String)
+		return fmt.Errorf("err: no dockey for guild [%s] with name \"%s\"", team.GuildID, team.Name)
 	}
-	log.Printf("grabbing schedule for guild [%s] with name \"%s\"\n", team.GuildID, team.Name.String)
+	log.Printf("grabbing schedule for guild [%s] with name \"%s\"\n", team.GuildID, team.Name)
 	if schedulePool[team.DocKey.String] != nil {
-		log.Printf("grabbed schedule for guild [%s] with name %q from pool", team.GuildID, team.Name.String)
+		log.Printf("grabbed schedule for guild [%s] with name %q from pool", team.GuildID, team.Name)
 		return nil
 	}
 	schedule, err := schedule.New(Service, Client, team.DocKey.String)
