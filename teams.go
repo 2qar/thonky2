@@ -17,16 +17,11 @@ var (
 
 // Team holds the config for a team in a guild.
 type Team struct {
-	ID               int            `db:"id"`
-	GuildID          string         `db:"server_id"`
-	Name             string         `db:"team_name"`
-	Channels         pq.StringArray `db:"channels"`
-	AnnounceChannel  sql.NullString `db:"announce_channel"`
-	DocKey           sql.NullString `db:"doc_key"`
-	RemindActivities pq.StringArray `db:"remind_activities"`
-	RemindIntervals  pq.Int64Array  `db:"remind_intervals"`
-	RoleMention      sql.NullString `db:"role_mention"`
-	UpdateInterval   int            `db:"update_interval"`
+	ID            int            `db:"id"`
+	GuildID       string         `db:"server_id"`
+	Name          string         `db:"team_name"`
+	Channels      pq.StringArray `db:"channels"`
+	spreadsheetID string
 }
 
 // Guild returns whether this team represents an entire Discord guild or not
@@ -36,27 +31,32 @@ func (t *Team) Guild() bool {
 
 // Schedule returns the schedule for this team, or nil if they haven't configured one
 func (t *Team) Schedule() *schedule.Schedule {
-	if t.DocKey.Valid {
-		return schedulePool[t.DocKey.String]
+	if len(t.spreadsheetID) > 0 {
+		return schedulePool[t.spreadsheetID]
 	}
 	return nil
 }
 
 // SheetLink returns the link to the team's sheet
 func (t *Team) SheetLink() string {
-	return "https://docs.google.com/spreadsheets/d/" + t.DocKey.String
+	return "https://docs.google.com/spreadsheets/d/" + t.spreadsheetID
 }
 
 func initTeam(team *Team) error {
-	if !team.DocKey.Valid {
+	var spreadsheetID string
+	var updateInterval int
+	err := DB.QueryRow("SELECT spreadsheet_id, update_interval FROM schedules WHERE team = $1", team.ID).Scan(&spreadsheetID, &updateInterval)
+	if err != nil {
 		return fmt.Errorf("err: no dockey for guild [%s] with name \"%s\"", team.GuildID, team.Name)
 	}
+	team.spreadsheetID = spreadsheetID
+
 	log.Printf("grabbing schedule for guild [%s] with name \"%s\"\n", team.GuildID, team.Name)
-	if schedulePool[team.DocKey.String] != nil {
+	if schedulePool[spreadsheetID] != nil {
 		log.Printf("grabbed schedule for guild [%s] with name %q from pool", team.GuildID, team.Name)
 		return nil
 	}
-	schedule, err := schedule.New(Service, Client, team.DocKey.String)
+	schedule, err := schedule.New(Service, Client, spreadsheetID)
 	if err != nil {
 		return err
 	}
@@ -94,16 +94,16 @@ func initTeam(team *Team) error {
 		}
 	}
 
-	schedulePool[team.DocKey.String] = schedule
+	schedulePool[spreadsheetID] = schedule
 
 	go func(t *Team) {
 		for {
-			time.Sleep(time.Duration(t.UpdateInterval) * time.Minute)
+			time.Sleep(time.Duration(updateInterval) * time.Minute)
 			updated, err := t.Schedule().Updated()
 			if err != nil {
 				log.Println(err)
 			} else if !updated {
-				log.Printf("bg updating [%s]\n", t.DocKey.String)
+				log.Printf("bg updating [%s]\n", spreadsheetID)
 				err = t.Schedule().Update()
 				if err != nil {
 					log.Println(err)

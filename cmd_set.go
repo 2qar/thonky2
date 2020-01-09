@@ -39,7 +39,7 @@ func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
-	} else if !team.DocKey.Valid {
+	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
 		return "No doc key for this guild.", nil
 	}
 	sched := team.Schedule()
@@ -111,8 +111,16 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 	}
 	sched := team.Schedule()
 
+	spreadsheetID, err := DB.SpreadsheetID(team.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "No spreadsheet for this team.", nil
+		}
+		return fmt.Sprintf("Error getting spreadsheet id: %s", err.Error()), err
+	}
+
 	var j types.JSONText
-	err := DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1", team.DocKey)
+	err = DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1")
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No default week schedule for this sheet", nil
@@ -140,7 +148,7 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 	if err != nil {
 		return "Error synchronizing sheets", err
 	}
-	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", team.DocKey.String), sched.Week)
+	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", spreadsheetID), sched.Week)
 	if err != nil {
 		return "Error caching new default week", err
 	}
@@ -153,8 +161,8 @@ func Schedule(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (
 	team := FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No team for this guild / channel", nil
-	} else if !team.DocKey.Valid {
-		return "No doc key for this guild.", nil
+	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
+		return "No spreadsheet for this team.", nil
 	}
 	sched := team.Schedule()
 
