@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bigheadgeorge/thonky2/schedule/utils"
+	"github.com/bigheadgeorge/thonky2/pkg/schedule/utils"
 )
 
 // file represents a file in Google Drive.

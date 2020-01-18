@@ -1,11 +1,13 @@
-package main
+package commands
 
 import (
 	"fmt"
 	"log"
 	"strings"
 
-	"github.com/bigheadgeorge/thonky2/schedule"
+	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/schedule"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -17,7 +19,7 @@ func init() {
 	examples := [][2]string{
 		{"!get week", "Show the schedule for this week."},
 	}
-	AddCommand("get", "Get information from the configured spreadsheet.", examples, Get)
+	command.AddCommand("get", "Get information from the configured spreadsheet.", examples, Get)
 }
 
 func logEmbed(e *discordgo.MessageEmbed) {
@@ -27,15 +29,18 @@ func logEmbed(e *discordgo.MessageEmbed) {
 }
 
 // Get formats information from a given spreadsheet into a Discord embed.
-func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	// TODO: add a team command that does this check before running the command and passes the team
-	team := FindTeam(m.GuildID, m.ChannelID)
+	team := s.FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
-	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
+	}
+	spreadsheetID, err := s.DB.SpreadsheetID(team.ID)
+	if err != nil {
 		return "No spreadsheet for this team.", nil
 	}
-	sched := team.Schedule()
+	sched := s.Schedules[spreadsheetID]
+	sheetLink := "https://docs.google.com/spreadsheets/d/" + spreadsheetID
 
 	if len(args) == 2 {
 		switch args[1] {
@@ -44,9 +49,9 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 			if sched.Week.Container == nil {
 				return "No week schedule, something broke", nil
 			}
-			embed := formatWeek(s, &sched.Week, team.SheetLink())
+			embed := formatWeek(s, &sched.Week, sheetLink)
 			logEmbed(embed)
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
 				return err.Error(), err
 			}
@@ -58,15 +63,15 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 			} else if sched.Players == nil {
 				return "No players, something broke", nil
 			}
-			embed := formatDay(s, &sched.Week, sched.Players, team.SheetLink(), sched.Week.Today())
+			embed := formatDay(s, &sched.Week, sched.Players, sheetLink, sched.Week.Today())
 			logEmbed(embed)
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, err.Error())
+				s.Session.ChannelMessageSend(m.ChannelID, err.Error())
 			}
 		case "unscheduled":
 			log.Println("getting unscheduled")
-			embed := baseEmbed("Open Scrims", team.SheetLink())
+			embed := baseEmbed("Open Scrims", sheetLink)
 			addTimeField(embed, "Times", &sched.Week)
 
 			today := sched.Week.Today()
@@ -87,7 +92,7 @@ func Get(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: sched.Week.Days[currDay], Value: open, Inline: false})
 			}
 
-			_, err := s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 			if err != nil {
 				return "Error sending embed: " + err.Error(), err
 			}
@@ -125,10 +130,10 @@ func addTimeField(e *discordgo.MessageEmbed, title string, week *schedule.Week) 
 }
 
 // formatWeek formats week information into a Discord embed
-func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *discordgo.MessageEmbed {
+func formatWeek(s *state.State, w *schedule.Week, sheetLink string) *discordgo.MessageEmbed {
 	embed := baseEmbed("Week of "+w.Date, sheetLink)
 	addTimeField(embed, "Times", w)
-	emojiGuild, err := s.Guild("437847669839495168")
+	emojiGuild, err := s.Session.Guild("437847669839495168")
 	if err != nil {
 		return embed
 	}
@@ -169,7 +174,7 @@ func formatWeek(s *discordgo.Session, w *schedule.Week, sheetLink string) *disco
 	return embed
 }
 
-func formatDay(s *discordgo.Session, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
+func formatDay(s *state.State, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
 	addTimeField(embed, "Players", w)
 

@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -15,7 +17,7 @@ func init() {
 	examples := [][2]string{
 		{"!owl today", "Get a list of games happening today"},
 	}
-	AddCommand("owl", "Get info on Overwatch League games", examples, OWL)
+	command.AddCommand("owl", "Get info on Overwatch League games", examples, OWL)
 }
 
 type matchSchedule struct {
@@ -113,7 +115,7 @@ func getMatches() (*matchSchedule, error) {
 }
 
 // OWL posts information about Overwatch League games
-func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+func OWL(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	if len(args) == 1 || len(args) > 2 {
 		return "Weird number of args", nil
 	}
@@ -158,7 +160,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 						})
 					}
 
-					s.ChannelMessageSendEmbed(m.ChannelID, embed)
+					s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 					return "", nil
 				}
 			}
@@ -173,7 +175,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 		for _, stage := range sched.Data.Stages {
 			for _, match := range stage.Matches {
 				if match.Status == "PENDING" {
-					s.ChannelMessageSendEmbed(m.ChannelID, nextMatchEmbed(&match))
+					s.Session.ChannelMessageSendEmbed(m.ChannelID, nextMatchEmbed(&match))
 					return "", nil
 				}
 			}
@@ -202,7 +204,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 		if match.Status == "PENDING" || match.Status == "" {
 			embed = nextMatchEmbed(match)
 		} else {
-			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			s.Session.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Color: 0x633FA3,
 				Title: fmt.Sprintf("%s %s - %s %s", timeEmotes[match.Scores[0].Value], match.Teams[0].Name, match.Teams[1].Name, timeEmotes[match.Scores[1].Value]),
 				URL:   "https://www.twitch.tv/overwatchleague",
@@ -214,7 +216,7 @@ func OWL(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (strin
 			})
 		}
 
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 	default:
 		return fmt.Sprintf("Invalid option %q.", args[1]), nil
 	}

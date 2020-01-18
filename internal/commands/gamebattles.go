@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"database/sql"
@@ -6,7 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bigheadgeorge/thonky2/gamebattles"
+	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/db"
+	"github.com/bigheadgeorge/thonky2/pkg/gamebattles"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -17,13 +20,13 @@ func init() {
 		{"!gamebattles Feeders", "Search gamebattles for a team with \"Feeders\" in the name (case-sensitive)."},
 		{"!gb Feeders", "Same as above, just a shortcut :)"},
 	}
-	AddCommand("gamebattles", "Get info about other teams in a Gamebattles tournament.", examples, Gamebattles).AddAliases("gb")
+	command.AddCommand("gamebattles", "Get info about other teams in a Gamebattles tournament.", examples, Gamebattles).AddAliases("gb")
 }
 
 // Gamebattles gets team information off of gamebattles.
-func Gamebattles(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+func Gamebattles(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	var teamStats TeamStats
-	msg, err := getTeamStats(m, searchGamebattles, matchBattlefy, &teamStats)
+	msg, err := getTeamStats(s, m, searchGamebattles, matchBattlefy, &teamStats)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}
@@ -31,7 +34,7 @@ func Gamebattles(s *discordgo.Session, m *discordgo.MessageCreate, args []string
 	embed := formatTeamStats(teamStats.Team, convertPlayers(teamStats.Players))
 	embed.Color = 0x22242C
 	embed.Author.IconURL = gamebattlesLogo
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	s.Session.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	return "", nil
 }
 
@@ -44,9 +47,9 @@ func gamebattlesPlayers(players []gamebattles.Player) []Player {
 	return genericPlayers
 }
 
-func searchGamebattles(team_id int, name string, teamStats *TeamStats) (string, error) {
+func searchGamebattles(db *db.Handler, team_id int, name string, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
-	err := DB.QueryRow("SELECT tournament_link FROM gamebattles WHERE team = $1", team_id).Scan(&tournamentLink)
+	err := db.QueryRow("SELECT tournament_link FROM gamebattles WHERE team = $1", team_id).Scan(&tournamentLink)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No config for Gamebattles; use !set_tournament.", nil
@@ -91,7 +94,7 @@ func searchGamebattles(team_id int, name string, teamStats *TeamStats) (string, 
 	return "", nil
 }
 
-func matchGamebattles(team, round int, teamStats *TeamStats) (string, error) {
+func matchGamebattles(db *db.Handler, team, round int, teamStats *TeamStats) (string, error) {
 	// TODO: figure out how the rounds api stuff works on gamebattles
 	//       https://gamebattles.majorleaguegaming.com/pc/overwatch/tournament/Breakable-Barriers-NA-1/bracket
 	return "i haven't actually done this part yet", nil

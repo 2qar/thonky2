@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bigheadgeorge/thonky2/schedule/utils"
+	"github.com/bigheadgeorge/thonky2/pkg/schedule/utils"
 )
 
 // Week stores the schedule for the week.

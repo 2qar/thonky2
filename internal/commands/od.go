@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"fmt"
@@ -8,14 +8,16 @@ import (
 	"sync"
 
 	"github.com/bigheadgeorge/goverbuff"
+	"github.com/bigheadgeorge/thonky2/pkg/db"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
 
 // searchOD searches the participants in a tournament for the given name.
-type searchOD func(int, string, *TeamStats) (string, error)
+type searchOD func(*db.Handler, int, string, *TeamStats) (string, error)
 
 // matchOD gets stats for the opposing team in a given round in a tournament.
-type matchOD func(int, int, *TeamStats) (string, error)
+type matchOD func(*db.Handler, int, int, *TeamStats) (string, error)
 
 // Player has methods for getting information about a player.
 type Player interface {
@@ -37,8 +39,8 @@ type TeamStats struct {
 }
 
 // getTeamStats gets the SR of every player on a team found with the given search and match methods.
-func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, teamStats *TeamStats) (string, error) {
-	team := FindTeam(m.GuildID, m.ChannelID)
+func getTeamStats(s *state.State, m *discordgo.MessageCreate, search searchOD, match matchOD, teamStats *TeamStats) (string, error) {
+	team := s.FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
 	} else if strings.Count(m.Content, " ") == 0 { // hacky argument check
@@ -50,9 +52,9 @@ func getTeamStats(m *discordgo.MessageCreate, search searchOD, match matchOD, te
 	teamName := m.Content[strings.Index(m.Content, " ")+1:]
 	num, err := strconv.Atoi(teamName)
 	if err != nil {
-		msg, err = search(team.ID, teamName, teamStats)
+		msg, err = search(s.DB, team.ID, teamName, teamStats)
 	} else {
-		msg, err = match(team.ID, num, teamStats)
+		msg, err = match(s.DB, team.ID, num, teamStats)
 	}
 	return msg, err
 }

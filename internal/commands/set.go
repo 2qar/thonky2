@@ -1,4 +1,4 @@
-package main
+package commands
 
 import (
 	"database/sql"
@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/bigheadgeorge/spreadsheet"
-	"github.com/bigheadgeorge/thonky2/schedule"
+	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/schedule"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 	"github.com/jmoiron/sqlx/types"
 )
@@ -20,35 +22,37 @@ func init() {
 		{"To give multiple responses / activities, use commas:", "!set tydra monday 4-6 no, yes"},
 		{"Give one response over a range to set it all to that one response:", "!set monday 4-10 free"},
 	}
-	AddCommand("set", "Update information on the configured spreadsheet.", examples, Set)
+	command.AddCommand("set", "Update information on the configured spreadsheet.", examples, Set)
 
 	examples = [][2]string{
 		{"!reset", "Load a given default week schedule (use !save to do that)"},
 	}
-	AddCommand("reset", "Reset the week schedule on a sheet to default", examples, Reset)
+	command.AddCommand("reset", "Reset the week schedule on a sheet to default", examples, Reset)
 
 	examples = [][2]string{
 		{"!set monday 4-6 scrim", "Set the 4-6 block on Monday to Scrim"},
 	}
-	AddCommand("set", "Update cells on the spreadsheet.", examples, Set)
+	command.AddCommand("set", "Update cells on the spreadsheet.", examples, Set)
 
 	examples = [][2]string{
 		{"!set_note monday 4-6 Inked", "Block out scrims 4-6 for Inked"},
 	}
-	AddCommand("set_note", "Add notes on the week schedule", examples, SetNote)
+	command.AddCommand("set_note", "Add notes on the week schedule", examples, SetNote)
 }
 
 type updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)
 
 // updateSheet updates cells, notes, whatever on the spreadsheet by parsing a whatever spaghetti people shove in as arguments
-func updateSheet(m *discordgo.MessageCreate, args []string, validWeekArgs, validPlayerArgs []string, updater updater) (string, error) {
-	team := FindTeam(m.GuildID, m.ChannelID)
+func updateSheet(s *state.State, m *discordgo.MessageCreate, args []string, validWeekArgs, validPlayerArgs []string, updater updater) (string, error) {
+	team := s.FindTeam(m.GuildID, m.ChannelID)
 	if team == nil {
 		return "No config for this guild.", nil
-	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
+	}
+	spreadsheetID, err := s.DB.SpreadsheetID(team.ID)
+	if err != nil {
 		return "No doc key for this guild.", nil
 	}
-	sched := team.Schedule()
+	sched := s.Schedules[spreadsheetID]
 
 	if len(args) >= 3 {
 		day := sched.Week.DayInt(args[1])
@@ -109,23 +113,14 @@ func updateRange(title string, sched *schedule.Schedule, cells []*spreadsheet.Ce
 }
 
 // Reset loads the default week schedule for a sheet
-func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	team := FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
-		return "No team in this guild / channel", nil
-	}
-	sched := team.Schedule()
-
-	spreadsheetID, err := DB.SpreadsheetID(team.ID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "No spreadsheet for this team.", nil
-		}
-		return fmt.Sprintf("Error getting spreadsheet id: %s", err.Error()), err
+func Reset(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	sched := s.FindSchedule(m.GuildID, m.ChannelID)
+	if sched == nil {
+		return "", nil
 	}
 
 	var j types.JSONText
-	err = DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1")
+	err := s.DB.Get(&j, "SELECT default_week FROM sheet_info WHERE id = $1")
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No default week schedule for this sheet", nil
@@ -153,7 +148,7 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 	if err != nil {
 		return "Error synchronizing sheets", err
 	}
-	err = DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", spreadsheetID), sched.Week)
+	err = s.DB.ExecJSON(fmt.Sprintf("UPDATE cache SET week = $1 WHERE id = '%s'", sched.ID), sched.Week)
 	if err != nil {
 		return "Error caching new default week", err
 	}
@@ -162,19 +157,16 @@ func Reset(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (str
 }
 
 // Set updates a cell on a sheet.
-func Set(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	team := FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
-		return "No team in this channel or server.", nil
-	} else if _, err := DB.SpreadsheetID(team.ID); err != nil {
-		return "No spreadsheet configured; can't update anything.", nil
+func Set(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	if sched := s.FindSchedule(m.GuildID, m.ChannelID); sched != nil {
+		return updateSheet(s, m, args, sched.ValidActivities, []string{"Yes", "Maybe", "No"}, updateCell)
 	}
-	return updateSheet(m, args, team.Schedule().ValidActivities, []string{"Yes", "Maybe", "No"}, updateCell)
+	return "", nil
 }
 
 // SetNote updates a note on a sheet.
-func SetNote(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
-	return updateSheet(m, args, []string{}, []string{}, updateNote)
+func SetNote(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	return updateSheet(s, m, args, []string{}, []string{}, updateNote)
 }
 
 func update(sheet *spreadsheet.Sheet, cells []*spreadsheet.Cell, newValues []string, updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)) {

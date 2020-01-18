@@ -1,11 +1,14 @@
-package main
+package commands
 
 import (
 	"database/sql"
 	"fmt"
 	"strings"
 
-	"github.com/bigheadgeorge/thonky2/battlefy"
+	"github.com/bigheadgeorge/thonky2/pkg/battlefy"
+	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/db"
+	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -16,13 +19,13 @@ func init() {
 		{"!battlefy Feeders", "Search the current tournament for teams with \"Feeders\" in their name."},
 		{"!bf Feeders", "Same as above, but it's a shortcut. :)"},
 	}
-	AddCommand("battlefy", "Get team info from the current Battlefy tournament.", examples, Battlefy).AddAliases("bf")
+	command.AddCommand("battlefy", "Get team info from the current Battlefy tournament.", examples, Battlefy).AddAliases("bf")
 }
 
 // Battlefy gets team information from Battlefy.
-func Battlefy(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (string, error) {
+func Battlefy(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	var teamStats TeamStats
-	msg, err := getTeamStats(m, searchBattlefy, matchBattlefy, &teamStats)
+	msg, err := getTeamStats(s, m, searchBattlefy, matchBattlefy, &teamStats)
 	if len(msg) > 0 || err != nil {
 		return msg, err
 	}
@@ -42,7 +45,7 @@ func Battlefy(s *discordgo.Session, m *discordgo.MessageCreate, args []string) (
 	embed := formatTeamStats(teamStats.Team, players)
 	embed.Color = 0xe74c3c
 	embed.Author.IconURL = battlefyLogo
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	s.Session.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	return "", nil
 }
 
@@ -56,9 +59,9 @@ func battlefyPlayers(players []battlefy.Player) []Player {
 }
 
 // searchBattlefy populates the given []Player and ODTeam with Battlefy search results.
-func searchBattlefy(team_id int, name string, teamStats *TeamStats) (string, error) {
+func searchBattlefy(db *db.Handler, team_id int, name string, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
-	err := DB.QueryRow("SELECT tournament_link FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink)
+	err := db.QueryRow("SELECT tournament_link FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No Battlefy config for this guild; use !set_tournament.", nil
@@ -82,10 +85,10 @@ func searchBattlefy(team_id int, name string, teamStats *TeamStats) (string, err
 }
 
 // matchBattlefy gets stats on the opposing team in the given round of the tournament.
-func matchBattlefy(team_id int, round int, teamStats *TeamStats) (string, error) {
+func matchBattlefy(db *db.Handler, team_id int, round int, teamStats *TeamStats) (string, error) {
 	var tournamentLink string
 	var teamID string
-	err := DB.QueryRow("SELECT tournament_link, team_id FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink, &teamID)
+	err := db.QueryRow("SELECT tournament_link, team_id FROM battlefy WHERE team = $1", team_id).Scan(&tournamentLink, &teamID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "No Battlefy config; use !set_tournament.", nil
