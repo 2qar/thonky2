@@ -44,15 +44,10 @@ type updater func(*spreadsheet.Sheet, *spreadsheet.Cell, string)
 
 // updateSheet updates cells, notes, whatever on the spreadsheet by parsing a whatever spaghetti people shove in as arguments
 func updateSheet(s *state.State, m *discordgo.MessageCreate, args []string, validWeekArgs, validPlayerArgs []string, updater updater) (string, error) {
-	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
-		return "No config for this guild.", nil
+	sched := s.FindSchedule(m.GuildID, m.ChannelID)
+	if sched == nil {
+		return "", nil
 	}
-	spreadsheetID, err := s.DB.SpreadsheetID(team.ID)
-	if err != nil {
-		return "No doc key for this guild.", nil
-	}
-	sched := s.Schedules[spreadsheetID]
 
 	if len(args) >= 3 {
 		day := sched.Week.DayInt(args[1])

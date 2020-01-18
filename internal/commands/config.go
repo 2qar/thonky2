@@ -156,37 +156,29 @@ func AddChannels(s *state.State, m *discordgo.MessageCreate, args []string) (str
 
 // Save saves a sheet's current week schedule for resetting to
 func Save(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
-	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
-		return "No teams in this server / channel", nil
-	}
-	var spreadsheetID string
-	err := s.DB.QueryRow("SELECT spreadsheet_id FROM schedules WHERE team = $1", team.ID).Scan(&spreadsheetID)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return "No spreadsheet configured.", nil
-		}
-		return fmt.Sprintf("Error grabbing spreadsheet id: %s", err.Error()), err
+	sched := s.FindSchedule(m.GuildID, m.ChannelID)
+	if sched == nil {
+		return "", nil
 	}
 
-	b, err := json.Marshal(s.Schedules[spreadsheetID].Week)
+	b, err := json.Marshal(sched.Week)
 	if err != nil {
 		return "Error encoding schedule, something stupid happened", err
 	}
 
-	r, err := s.DB.Query("SELECT id FROM sheet_info WHERE id = $1", spreadsheetID)
+	r, err := s.DB.Query("SELECT id FROM sheet_info WHERE id = $1", sched.ID)
 	if err != nil {
 		return "Error querying database, something stupid happened", nil
 	}
 	defer r.Close()
 
 	if r.Next() {
-		_, err := s.DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, spreadsheetID)
+		_, err := s.DB.Query("UPDATE sheet_info SET default_week = $1 WHERE id = $2", b, sched.ID)
 		if err != nil {
 			return "Error updating default", err
 		}
 	} else {
-		_, err := s.DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", spreadsheetID, b)
+		_, err := s.DB.Query("INSERT INTO sheet_info (id, default_week) VALUES ($1, $2)", sched.ID, b)
 		if err != nil {
 			return "Error setting default", err
 		}
