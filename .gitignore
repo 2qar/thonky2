@@ -2,6 +2,4 @@ thonky2
 
 service_account.json
 client_secret.json
-logs/
 config.json
-cache/
