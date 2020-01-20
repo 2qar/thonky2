@@ -1,14 +1,13 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/bigheadgeorge/thonky2/pkg/command"
+	"github.com/bigheadgeorge/thonky2/pkg/owl"
 	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
 )
@@ -18,29 +17,6 @@ func init() {
 		{"!owl today", "Get a list of games happening today"},
 	}
 	command.AddCommand("owl", "Get info on Overwatch League games", examples, OWL)
-}
-
-type matchSchedule struct {
-	Data struct {
-		Stages []struct {
-			Matches []match
-		}
-	}
-}
-
-type match struct {
-	ID    json.Number
-	Teams [2]struct {
-		Name string
-		Logo string
-	} `json:"competitors"`
-	Scores [2]struct {
-		Value int
-	}
-	Status   string
-	Timezone string    `json:"timeZone"`
-	Start    time.Time `json:"startDate"`
-	End      time.Time `json:"endDate"`
 }
 
 // date returns a Time in the format month/day
@@ -69,7 +45,7 @@ func owlEmbed() *discordgo.MessageEmbed {
 }
 
 // nextMatchEmbed creates an embed out of a pending OWL match
-func nextMatchEmbed(m *match) *discordgo.MessageEmbed {
+func nextMatchEmbed(m *owl.Match) *discordgo.MessageEmbed {
 	embed := owlEmbed()
 
 	localTZ, _ := time.LoadLocation("America/Los_Angeles")
@@ -101,19 +77,6 @@ func nextMatchEmbed(m *match) *discordgo.MessageEmbed {
 	return embed
 }
 
-// getMatches grabs the schedule from the OWL website
-func getMatches() (*matchSchedule, error) {
-	r, err := http.Get("https://api.overwatchleague.com/schedule")
-	if err != nil {
-		return nil, err
-	}
-	defer r.Body.Close()
-
-	var s matchSchedule
-	err = json.NewDecoder(r.Body).Decode(&s)
-	return &s, err
-}
-
 // OWL posts information about Overwatch League games
 func OWL(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	if len(args) == 1 || len(args) > 2 {
@@ -122,11 +85,11 @@ func OWL(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 
 	switch strings.ToLower(args[1]) {
 	case "today":
-		sched, err := getMatches()
+		sched, err := owl.Matches()
 		if err != nil {
 			return "Error grabbing OWL schedule.", err
 		}
-		var matches []match
+		var matches []owl.Match
 		now := time.Now()
 		localTZ, _ := time.LoadLocation("America/Los_Angeles")
 
@@ -168,7 +131,7 @@ func OWL(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 
 		return "No games today.", nil
 	case "next":
-		sched, err := getMatches()
+		sched, err := owl.Matches()
 		if err != nil {
 			return "Error grabbing OWL schedule.", err
 		}
@@ -183,26 +146,14 @@ func OWL(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 
 		return "No games left. :(", nil
 	case "now":
-		r, err := http.Get("https://api.overwatchleague.com/live-match")
+		match, err := owl.Live()
 		if err != nil {
-			return "Error grabbing live match.", err
+			return "Error grabbing live match: " + err.Error(), err
 		}
-		defer r.Body.Close()
-
-		live := struct {
-			Data struct {
-				LiveMatch match
-			}
-		}{}
-		err = json.NewDecoder(r.Body).Decode(&live)
-		if err != nil {
-			return "Error parsing live match info.", err
-		}
-		match := &live.Data.LiveMatch
 
 		var embed *discordgo.MessageEmbed
 		if match.Status == "PENDING" || match.Status == "" {
-			embed = nextMatchEmbed(match)
+			embed = nextMatchEmbed(&match)
 		} else {
 			s.Session.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Color: 0x633FA3,
