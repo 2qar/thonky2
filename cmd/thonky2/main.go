@@ -26,7 +26,6 @@ import (
 var state botstate.State
 
 func main() {
-	state.Teams = make(map[string][]*team.Team)
 	state.Schedules = make(map[string]*schedule.Schedule)
 
 	if _, err := os.Open("config.json"); os.IsNotExist(err) {
@@ -98,18 +97,17 @@ func ready(s *discordgo.Session, r *discordgo.Ready) {
 	log.Println("ready")
 
 	for _, guild := range r.Guilds {
-		var t []*team.Team
-		err := state.DB.Select(&t, "SELECT * FROM teams WHERE server_id = $1", guild.ID)
+		var teams []*team.Team
+		err := state.DB.Select(&teams, "SELECT * FROM teams WHERE server_id = $1", guild.ID)
 		if err != nil {
-			log.Println(err)
+			log.Printf("error grabbing teams in guild [%s]: %s\n", guild.ID, err)
 			continue
 		}
-		state.Teams[guild.ID] = t
 
 		var config reminders.Config
 		var spreadsheetID string
 		var updateInterval int
-		for _, team := range state.Teams[guild.ID] {
+		for _, team := range teams {
 			err = state.DB.Get(&config, "SELECT * FROM reminders WHERE team = $1", team.ID)
 			if err != nil {
 				log.Printf("error grabbing reminders for team %d: %s\n", team.ID, err)

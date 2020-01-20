@@ -63,13 +63,6 @@ func (d *Handler) GetName(channelID string) (string, error) {
 	return teamName, err
 }
 
-// GetTeams gets the config for each team in a server
-func (d *Handler) GetTeams(guildID string) ([]*team.Team, error) {
-	teams := []*team.Team{}
-	err := d.Select(&teams, "SELECT * FROM teams WHERE server_id=$1", guildID)
-	return teams, err
-}
-
 // ExecJSON runs a query with a JSON representation of v.
 func (d *Handler) ExecJSON(query string, v interface{}) error {
 	b, err := json.Marshal(v)

@@ -41,7 +41,7 @@ type TeamStats struct {
 // getTeamStats gets the SR of every player on a team found with the given search and match methods.
 func getTeamStats(s *state.State, m *discordgo.MessageCreate, search searchOD, match matchOD, teamStats *TeamStats) (string, error) {
 	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
+	if team.ID == 0 {
 		return "No config for this guild.", nil
 	} else if strings.Count(m.Content, " ") == 0 { // hacky argument check
 		return "No args.", nil

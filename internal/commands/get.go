@@ -30,17 +30,11 @@ func logEmbed(e *discordgo.MessageEmbed) {
 
 // Get formats information from a given spreadsheet into a Discord embed.
 func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
-	// TODO: add a team command that does this check before running the command and passes the team
-	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
-		return "No config for this guild.", nil
+	sched := s.FindSchedule(m.GuildID, m.ChannelID)
+	if sched == nil {
+		return "", nil
 	}
-	spreadsheetID, err := s.DB.SpreadsheetID(team.ID)
-	if err != nil {
-		return "No spreadsheet for this team.", nil
-	}
-	sched := s.Schedules[spreadsheetID]
-	sheetLink := "https://docs.google.com/spreadsheets/d/" + spreadsheetID
+	sheetLink := "https://docs.google.com/spreadsheets/d/" + sched.ID
 
 	if len(args) == 2 {
 		switch args[1] {

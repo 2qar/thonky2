@@ -60,7 +60,7 @@ func sendPermission(s *discordgo.Session, channelID string) (bool, error) {
 // AddTeam adds a team to a guild
 func AddTeam(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	team := s.GuildTeam(m.GuildID)
-	if team == nil {
+	if team.ID == 0 {
 		return "No team for this guild.", fmt.Errorf("no team for [%s]\n", m.GuildID)
 	}
 
@@ -102,7 +102,7 @@ func AddChannels(s *state.State, m *discordgo.MessageCreate, args []string) (str
 	}
 
 	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
+	if team.ID == 0 {
 		return "No config for this guild.", nil
 	}
 
@@ -189,7 +189,7 @@ func Save(s *state.State, m *discordgo.MessageCreate, args []string) (string, er
 // SetTournament updates the tournament a team is participating in and, optionally, their team on the tournament site.
 func SetTournament(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	team := s.FindTeam(m.GuildID, m.ChannelID)
-	if team == nil {
+	if team.ID == 0 {
 		return "Error grabbing team", nil
 	}
 

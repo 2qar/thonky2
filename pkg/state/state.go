@@ -17,43 +17,33 @@ type State struct {
 	DB        *db.Handler
 	Client    *http.Client
 	Service   *spreadsheet.Service
-	Teams     map[string][]*team.Team
 	Schedules map[string]*schedule.Schedule
 }
 
 // FindTeam finds a team in a channel in a guild.
-func (s *State) FindTeam(guildID, channelID string) *team.Team {
-	if len(s.Teams[guildID]) == 1 {
-		return s.Teams[guildID][0]
+func (s *State) FindTeam(guildID, channelID string) team.Team {
+	var t team.Team
+	err := s.DB.Get(&t, "SELECT * FROM teams WHERE server_id = $1 AND $2 = ANY(channels)", guildID, channelID)
+	if err != nil && err == sql.ErrNoRows {
+		return s.GuildTeam(guildID)
 	}
-
-	for _, team := range s.Teams[guildID] {
-		for _, channel := range team.Channels {
-			if channel == channelID {
-				return team
-			}
-		}
-	}
-	return s.GuildTeam(guildID)
+	return t
 }
 
 // GuildTeam returns the guild's team.
-func (s *State) GuildTeam(guildID string) *team.Team {
-	if len(s.Teams[guildID]) == 1 {
-		return s.Teams[guildID][0]
+func (s *State) GuildTeam(guildID string) team.Team {
+	var t team.Team
+	err := s.DB.Get(&t, "SELECT * FROM teams WHERE server_id = $1 AND 0 = LENGTH(team_name)", guildID)
+	if err != nil {
+		return team.Team{}
 	}
-	for _, team := range s.Teams[guildID] {
-		if team.Guild() {
-			return team
-		}
-	}
-	return nil
+	return t
 }
 
 // FindSchedule looks for a team, then looks for their schedule
 func (s *State) FindSchedule(guildID, channelID string) *schedule.Schedule {
 	team := s.FindTeam(guildID, channelID)
-	if team == nil {
+	if team.ID == 0 {
 		s.Session.ChannelMessageSend(channelID, "No team in this channel or server.")
 		return nil
 	}
