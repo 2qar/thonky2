@@ -36,6 +36,7 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 	}
 	sheetLink := "https://docs.google.com/spreadsheets/d/" + sched.ID
 
+	var embed *discordgo.MessageEmbed
 	if len(args) == 2 {
 		switch args[1] {
 		case "week":
@@ -43,12 +44,7 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 			if sched.Week.Container == nil {
 				return "No week schedule, something broke", nil
 			}
-			embed := formatWeek(s, &sched.Week, sheetLink)
-			logEmbed(embed)
-			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
-			if err != nil {
-				return err.Error(), err
-			}
+			embed = formatWeek(s, &sched.Week, sheetLink)
 			log.Println("sent week :)")
 		case "today":
 			log.Println("getting today")
@@ -57,15 +53,10 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 			} else if sched.Players == nil {
 				return "No players, something broke", nil
 			}
-			embed := formatDay(s, &sched.Week, sched.Players, sheetLink, sched.Week.Today())
-			logEmbed(embed)
-			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
-			if err != nil {
-				s.Session.ChannelMessageSend(m.ChannelID, err.Error())
-			}
+			embed = formatDay(s, &sched.Week, sched.Players, sheetLink, sched.Week.Today())
 		case "unscheduled":
 			log.Println("getting unscheduled")
-			embed := baseEmbed("Open Scrims", sheetLink)
+			embed = baseEmbed("Open Scrims", sheetLink)
 			addTimeField(embed, "Times", &sched.Week)
 
 			today := sched.Week.Today()
@@ -85,12 +76,15 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 				}
 				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: sched.Week.Days[currDay], Value: open, Inline: false})
 			}
-
-			_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
-			if err != nil {
-				return "Error sending embed: " + err.Error(), err
-			}
+		default:
+			return fmt.Sprintf("Invalid option for !get: %q", args[1]), nil
 		}
+	}
+
+	logEmbed(embed)
+	_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
+	if err != nil {
+		return err.Error(), err
 	}
 	return "", nil
 }
