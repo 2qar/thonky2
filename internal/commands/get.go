@@ -22,12 +22,6 @@ func init() {
 	command.AddCommand("get", "Get information from the configured spreadsheet.", examples, Get)
 }
 
-func logEmbed(e *discordgo.MessageEmbed) {
-	for _, field := range e.Fields {
-		log.Println(*field)
-	}
-}
-
 // Get formats information from a given spreadsheet into a Discord embed.
 func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
 	sched := s.FindSchedule(m.GuildID, m.ChannelID)
@@ -56,32 +50,15 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 			embed = formatDay(s, &sched.Week, sched.Players, sheetLink, sched.Week.Today())
 		case "unscheduled":
 			log.Println("getting unscheduled")
-			embed = baseEmbed("Open Scrims", sheetLink)
-			addTimeField(embed, "Times", &sched.Week)
-
-			today := sched.Week.Today()
-			activities := sched.Week.Values()
-			for i := 0; i < 7; i++ {
-				currDay := (i + today) % 7
-				var open string
-				for j, activity := range activities[currDay] {
-					if activity == "Scrim" && sched.Week.Container[currDay][j].Note == "" {
-						open += ":regional_indicator_o:"
-					} else {
-						open += ":black_large_square:"
-					}
-					if j < 5 {
-						open += ", "
-					}
-				}
-				embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: sched.Week.Days[currDay], Value: open, Inline: false})
-			}
+			embed = formatUnscheduled(sched, sheetLink)
 		default:
 			return fmt.Sprintf("Invalid option for !get: %q", args[1]), nil
 		}
 	}
 
-	logEmbed(embed)
+	for _, field := range embed.Fields {
+		log.Println(*field)
+	}
 	_, err := s.Session.ChannelMessageSendEmbed(m.ChannelID, embed)
 	if err != nil {
 		return err.Error(), err
@@ -162,26 +139,26 @@ func formatWeek(s *state.State, w *schedule.Week, sheetLink string) *discordgo.M
 	return embed
 }
 
+func roleEmoji(role string) string {
+	switch role {
+	case "Tanks":
+		return ":shield:"
+	case "DPS":
+		return ":crossed_swords:"
+	case "Supports":
+		return ":ambulance:"
+	case "Coaches":
+		return ":books:"
+	case "Flex":
+		return ":muscle:"
+	default:
+		return ""
+	}
+}
+
 func formatDay(s *state.State, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
 	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
 	addTimeField(embed, "Players", w)
-
-	roleEmoji := func(role string) string {
-		switch role {
-		case "Tanks":
-			return ":shield:"
-		case "DPS":
-			return ":crossed_swords:"
-		case "Supports":
-			return ":ambulance:"
-		case "Coaches":
-			return ":books:"
-		case "Flex":
-			return ":muscle:"
-		default:
-			return ""
-		}
-	}
 
 	roleAvailability := map[string]*[6]int{}
 	for _, player := range p {
@@ -216,5 +193,30 @@ func formatDay(s *state.State, w *schedule.Week, p []schedule.Player, sheetLink 
 		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: roleEmoji(role) + " " + role, Value: strings.Join(availability, ", "), Inline: false})
 	}
 
+	return embed
+}
+
+// formatUnscheduled highlights open scrim blocks
+func formatUnscheduled(sched *schedule.Schedule, sheetLink string) *discordgo.MessageEmbed {
+	embed := baseEmbed("Open Scrims", sheetLink)
+	addTimeField(embed, "Times", &sched.Week)
+
+	today := sched.Week.Today()
+	activities := sched.Week.Values()
+	for i := 0; i < 7; i++ {
+		currDay := (i + today) % 7
+		var open string
+		for j, activity := range activities[currDay] {
+			if activity == "Scrim" && sched.Week.Container[currDay][j].Note == "" {
+				open += ":regional_indicator_o:"
+			} else {
+				open += ":black_large_square:"
+			}
+			if j < 5 {
+				open += ", "
+			}
+		}
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{Name: sched.Week.Days[currDay], Value: open, Inline: false})
+	}
 	return embed
 }
