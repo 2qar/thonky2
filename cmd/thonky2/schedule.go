@@ -11,12 +11,6 @@ import (
 )
 
 func fetchSchedule(s *botstate.State, spreadsheetID string, updateInterval int) (*schedule.Schedule, error) {
-	// TODO: rewrite the entire flow of getting ts and spreadsheets and shit
-	//       1. grab all of the active t IDs
-	//       2. select doc keys from db with these IDs
-	//       3. load the spreadsheets with unique doc keys
-	//       replace FindTeam() in commands with TeamID() or smth like that
-	//       use that t ID to check for a schedule
 	schedule, err := schedule.New(s.Service, s.Client, spreadsheetID)
 	if err != nil {
 		return nil, err
