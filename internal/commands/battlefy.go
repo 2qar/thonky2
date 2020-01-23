@@ -19,7 +19,7 @@ func init() {
 		{"!battlefy Feeders", "Search the current tournament for teams with \"Feeders\" in their name."},
 		{"!bf Feeders", "Same as above, but it's a shortcut. :)"},
 	}
-	command.AddCommand("battlefy", "Get team info from the current Battlefy tournament.", examples, Battlefy).AddAliases("bf")
+	command.AddCommand("battlefy", "Get team info from the current Battlefy tournament.", examples, Battlefy).AddAliases("bf", "od")
 }
 
 // Battlefy gets team information from Battlefy.
