@@ -22,7 +22,6 @@ type Schedule struct {
 	Players         []Player
 	LastModified    time.Time
 	updating        bool
-	updatedModified time.Time
 	client          *http.Client
 	service         *spreadsheet.Service
 	*spreadsheet.Spreadsheet
@@ -64,13 +63,10 @@ func (s *Schedule) Update() error {
 	if err != nil {
 		return fmt.Errorf("error getting week: %s", err)
 	}
-	if s.LastModified.Before(s.updatedModified) {
-		s.LastModified = s.updatedModified
-	} else {
-		s.LastModified, err = lastModified(s.client, s.ID)
-		if err != nil {
-			return fmt.Errorf("error getting last modified: %s", err)
-		}
+
+	s.LastModified, err = lastModified(s.client, s.ID)
+	if err != nil {
+		return fmt.Errorf("error getting last modified time: %s", err)
 	}
 
 	return s.service.ReloadSpreadsheet(s.Spreadsheet)
@@ -78,12 +74,11 @@ func (s *Schedule) Update() error {
 
 // Updated returns whether the sheet is updated or not
 func (s *Schedule) Updated() (bool, error) {
-	var err error
-	s.updatedModified, err = lastModified(s.client, s.ID)
+	modified, err := lastModified(s.client, s.ID)
 	if err != nil {
 		return false, err
 	}
-	return s.updatedModified.Before(s.LastModified) || s.updatedModified.Equal(s.LastModified), nil
+	return modified.Before(s.LastModified) || modified.Equal(s.LastModified), nil
 }
 
 // SyncSheet pushes all of the changes on a sheet and updates the modified time.

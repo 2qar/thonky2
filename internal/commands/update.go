@@ -9,7 +9,11 @@ import (
 )
 
 func init() {
-	command.AddCommand("update", "Update the sheet", [][2]string{{"!update", "Update the sheet. :)"}}, Update)
+	examples := [][2]string{
+		{"!update", "Grab the spreadsheet if any new changes have been made."},
+		{"!update force", "Grab the spreadsheet, even if there aren't any new changes."},
+	}
+	command.AddCommand("update", "Update the sheet", examples, Update)
 }
 
 // Update updates the sheet locally
@@ -19,15 +23,20 @@ func Update(s *state.State, m *discordgo.MessageCreate, args []string) (string, 
 		return "", nil
 	}
 
-	updated, err := sched.Updated()
-	if err != nil {
-		return "Error checking if the sheet is updated. :(", err
-	} else if updated {
-		return "Nothing to update.", nil
+	if len(args) == 1 {
+		updated, err := sched.Updated()
+		if err != nil {
+			return "Error checking if the sheet is updated. :(", err
+		} else if updated {
+			return "Nothing to update.", nil
+		}
+	} else if len(args) == 2 && args[1] != "force" {
+		return "Unknown argument \"" + args[1] + "\"", nil
 	}
+
 	msg, _ := s.Session.ChannelMessageSend(m.ChannelID, "Updating...")
 
-	err = sched.Update()
+	err := sched.Update()
 	if err != nil {
 		if err.Error() == "already updating" {
 			s.Session.ChannelMessageEdit(m.ChannelID, msg.ID, "Already updating.")
