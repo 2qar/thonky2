@@ -61,8 +61,6 @@ type matchTeam struct {
 	Team Team `json:"team"`
 }
 
-// FIXME: something is fucky in findMatch() because the test is failing
-//        https://dtmwra1jsgyb0.cloudfront.net/stages/5d7b716bb7758c268b771f83/rounds/3/matches
 type match struct {
 	ID     string    `json:"_id"`
 	Top    matchTeam `json:"top"`
