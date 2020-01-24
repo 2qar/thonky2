@@ -2,8 +2,6 @@ package db
 
 import (
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
 	"strings"
 
 	"github.com/bigheadgeorge/thonky2/pkg/schedule"
@@ -11,31 +9,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
-
-// NewHandler constructs a new Handler.
-func NewHandler() (handler Handler, err error) {
-	var b []byte
-	b, err = ioutil.ReadFile("config.json")
-	if err != nil {
-		return
-	}
-
-	config := struct {
-		User     string
-		Pw       string
-		Host     string
-		Database string
-	}{}
-	err = json.Unmarshal(b, &config)
-
-	connStr := fmt.Sprintf("user=%s password=%s host=%s dbname=%s", config.User, config.Pw, config.Host, config.Database)
-	db, err := sqlx.Open("postgres", connStr)
-	if err != nil {
-		return
-	}
-	handler.DB = db
-	return
-}
 
 // Handler makes grabbing and updating config easier
 type Handler struct {

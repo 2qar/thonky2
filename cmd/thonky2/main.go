@@ -20,10 +20,20 @@ import (
 	botstate "github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bigheadgeorge/thonky2/pkg/team"
 	"github.com/bwmarrin/discordgo"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/oauth2/google"
 )
 
 var state botstate.State
+
+type config struct {
+	Token        string
+	GoogleAPIKey string `json:"google_api_key"`
+	User         string
+	Pw           string
+	Host         string
+	Database     string
+}
 
 func main() {
 	state.Schedules = make(map[string]*schedule.Schedule)
@@ -35,10 +45,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	config := struct {
-		Token        string
-		GoogleAPIKey string `json:"google_api_key"`
-	}{}
+	var config config
 	err = json.Unmarshal(b, &config)
 	if err != nil {
 		panic(err)
@@ -48,6 +55,12 @@ func main() {
 	} else if config.GoogleAPIKey == "" {
 		panic("no google api key in config.json")
 	}
+
+	d, err := sqlx.Open("postgres", fmt.Sprintf("user=%s password=%s host=%s dbname=%s", config.User, config.Pw, config.Host, config.Database))
+	if err != nil {
+		panic(err)
+	}
+	state.DB = &db.Handler{d}
 
 	b, err = ioutil.ReadFile("service_account.json")
 	if err != nil {
@@ -59,13 +72,6 @@ func main() {
 	}
 	state.Client = c.Client(context.Background())
 	state.Service = spreadsheet.NewServiceWithClient(state.Client)
-
-	db, err := db.NewHandler()
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-	state.DB = &db
 
 	state.Session, err = discordgo.New("Bot " + config.Token)
 	if err != nil {
