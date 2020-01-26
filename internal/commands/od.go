@@ -127,6 +127,9 @@ func formatTeamStats(odt ODTeam, players []goverbuff.Player) discordgo.MessageEm
 			Name: odt.Name(),
 			URL:  odt.Link(),
 		},
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "Player stats scraped from Overbuff",
+		},
 	}
 
 	sort.Slice(players, func(i, j int) bool {
