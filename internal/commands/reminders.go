@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bigheadgeorge/thonky2/pkg/command"
@@ -18,8 +19,11 @@ func init() {
 	examples := [][2]string{{"!reminders", "Show the reminder config for this team."}}
 	command.AddCommand("reminders", "Get reminder config for this team.", examples, Reminders)
 
-	examples[0] = [2]string{"!reminders_set activities Scrim", "Set \"Scrim\" as the only valid reminder activity for this team."}
+	examples = [][2]string{{"!reminders_set activities Scrim", "Set \"Scrim\" as the only valid reminder activity for this team."}}
 	command.AddCommand("reminders_set", "Update reminder config.", examples, RemindersSet)
+
+	examples = [][2]string{{"!reminders_add activities Scrim", "Add \"Scrim\" to the activities list."}}
+	command.AddCommand("reminders_add", "Add an item to a field in the reminder config.", examples, RemindersAdd)
 }
 
 // Reminders shows the reminder config for this team.
@@ -103,7 +107,96 @@ func RemindersSet(s *state.State, m *discordgo.MessageCreate, args []string) (st
 	}
 
 	if err != nil {
-		return fmt.Sprintf("Error updating %s: %s", args[2], err), err
+		return fmt.Sprintf("Error updating %s: %s", args[1], err), err
+	}
+
+	return "Updated " + args[1] + ".", nil
+}
+
+// RemindersAdd adds an item to either activities or intervals in a team's config
+func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	t := s.FindTeam(m.GuildID, m.ChannelID)
+	if t.ID == 0 {
+		return "No team in this channel / guild.", nil
+	}
+
+	if len(args) < 3 {
+		return "usage: !reminders_add <activities|intervals> <values...>", nil
+	}
+
+	var config reminders.Config
+	err := s.DB.Get(&config, "SELECT activities, intervals FROM reminders WHERE team = $1", t.ID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "No reminder config set up.", nil
+		}
+		return "Error grabbing reminder config: " + err.Error(), err
+	}
+	switch args[1] {
+	case "activities":
+		sched := s.FindSchedule(m.GuildID, m.ChannelID)
+		if sched == nil {
+			return "", nil
+		}
+
+		activities, parseErr := parseArgs(args[2:], sched.ValidActivities)
+		if parseErr != nil {
+			return err.Error(), nil
+		}
+		var foundUnique bool
+		for _, activity := range activities {
+			dupe := false
+			for _, addedActivity := range config.Activities {
+				if activity == addedActivity {
+					dupe = true
+					break
+				}
+			}
+			if !dupe {
+				config.Activities = append(config.Activities, activity)
+				foundUnique = true
+			}
+		}
+		if !foundUnique {
+			return "No new activities to add.", nil
+		}
+		_, err = s.DB.Exec("UPDATE reminders SET activities = $1 WHERE team = $2", config.Activities, t.ID)
+	case "intervals":
+		nums := make([]int64, 0, len(args[2:]))
+		for i, num := range args[2:] {
+			if num[len(num)-1] == ',' {
+				num = num[:len(num)-1]
+			}
+			nums[i], err = strconv.ParseInt(num, 10, 8)
+			if err != nil {
+				return fmt.Sprintf("Invalid number %q", num), nil
+			}
+		}
+
+		var foundUnique bool
+		for _, num := range nums {
+			dupe := false
+			for _, interval := range config.Intervals {
+				if num == interval {
+					dupe = true
+					break
+				}
+			}
+			if !dupe {
+				config.Intervals = append(config.Intervals, num)
+				foundUnique = true
+			}
+		}
+		if !foundUnique {
+			return "No new intervals to add.", nil
+		}
+		_, err = s.DB.Exec("UPDATE reminders SET intervals = $1 WHERE team = $2", config.Intervals, t.ID)
+	default:
+		return fmt.Sprintf("Invalid field %q, valid options: activities, intervals", args[1]), nil
+	}
+
+	if err != nil {
+		return fmt.Sprintf("Error updating %q: %s", args[1], err), err
 	}
 
 	return "Updated " + args[1] + ".", nil
