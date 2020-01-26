@@ -9,8 +9,9 @@ import (
 
 // Week stores the schedule for the week.
 type Week struct {
-	Date string
-	Days [7]string
+	Date     string
+	Days     [7]string
+	Timezone string
 	// StartTime is the hour (PM) that the schedule starts at.
 	StartTime int
 	// BlockLength is the length of an activity block in hours.

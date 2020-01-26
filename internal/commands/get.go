@@ -67,7 +67,7 @@ func Get(s *state.State, m *discordgo.MessageCreate, args []string) (string, err
 }
 
 // baseEmbed returns a template embed with the decorative stuff set up all ez
-func baseEmbed(title, sheetLink string) *discordgo.MessageEmbed {
+func baseEmbed(title, sheetLink, timezone string) *discordgo.MessageEmbed {
 	return &discordgo.MessageEmbed{
 		Color: 0x2ecc71,
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
@@ -79,7 +79,7 @@ func baseEmbed(title, sheetLink string) *discordgo.MessageEmbed {
 			IconURL: "https://www.clicktime.com/images/web-based/timesheet/integration/googlesheets.png",
 		},
 		Footer: &discordgo.MessageEmbedFooter{
-			Text: "Times shown in PST",
+			Text: "Times shown in " + timezone,
 		},
 	}
 }
@@ -96,7 +96,7 @@ func addTimeField(e *discordgo.MessageEmbed, title string, week *schedule.Week) 
 
 // formatWeek formats week information into a Discord embed
 func formatWeek(s *state.State, w *schedule.Week, sheetLink string) *discordgo.MessageEmbed {
-	embed := baseEmbed("Week of "+w.Date, sheetLink)
+	embed := baseEmbed("Week of "+w.Date, sheetLink, w.Timezone)
 	addTimeField(embed, "Times", w)
 	emojiGuild, err := s.Session.Guild("437847669839495168")
 	if err != nil {
@@ -157,7 +157,7 @@ func roleEmoji(role string) string {
 }
 
 func formatDay(s *state.State, w *schedule.Week, p []schedule.Player, sheetLink string, day int) *discordgo.MessageEmbed {
-	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink)
+	embed := baseEmbed("Schedule for "+w.Days[day], sheetLink, w.Timezone)
 	addTimeField(embed, "Players", w)
 
 	roleAvailability := map[string]*[6]int{}
@@ -198,7 +198,7 @@ func formatDay(s *state.State, w *schedule.Week, p []schedule.Player, sheetLink 
 
 // formatUnscheduled highlights open scrim blocks
 func formatUnscheduled(sched *schedule.Schedule, sheetLink string) *discordgo.MessageEmbed {
-	embed := baseEmbed("Open Scrims", sheetLink)
+	embed := baseEmbed("Open Scrims", sheetLink, sched.Week.Timezone)
 	addTimeField(embed, "Times", &sched.Week)
 
 	today := sched.Week.Today()
