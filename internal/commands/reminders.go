@@ -11,6 +11,7 @@ import (
 	"github.com/bigheadgeorge/thonky2/pkg/reminders"
 	"github.com/bigheadgeorge/thonky2/pkg/state"
 	"github.com/bwmarrin/discordgo"
+	"github.com/lib/pq"
 )
 
 func init() {
@@ -82,7 +83,7 @@ func RemindersSet(s *state.State, m *discordgo.MessageCreate, args []string) (st
 		if parseErr != nil {
 			return err.Error(), nil
 		}
-		_, err = s.DB.Exec("UPDATE reminders SET activities = $1 WHERE team = $2", activities)
+		_, err = s.DB.Exec("UPDATE reminders SET activities = $1 WHERE team = $2", pq.Array(activities), t.ID)
 	case "channel":
 		if !isChannel(args[2]) {
 			return "Invalid channel mention.", nil
