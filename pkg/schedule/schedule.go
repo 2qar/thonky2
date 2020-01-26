@@ -178,5 +178,7 @@ func (s *Schedule) getWeek(sheetName string) error {
 	}
 	s.Week.BlockLength = blockEnd - s.Week.StartTime
 
+	s.Week.Timezone = sheet.Rows[1][8].Value
+
 	return err
 }
