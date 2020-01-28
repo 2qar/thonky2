@@ -36,8 +36,8 @@ type Reminder struct {
 func (r Reminder) Run() {
 	today := time.Now()
 
-	var activities []string
-	err := r.State.DB.QueryRow("SELECT spreadsheet_id FROM schedules WHERE team = $1", r.Team.ID).Scan(&activities)
+	var activities pq.StringArray
+	err := r.State.DB.QueryRow("SELECT activities FROM schedules WHERE team = $1", r.Team.ID).Scan(&activities)
 	if err != nil {
 		log.Printf("error grabbing reminder activities for team %d: %s\n", r.Team.ID, err)
 		return
