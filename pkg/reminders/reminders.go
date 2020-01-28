@@ -34,8 +34,6 @@ type Reminder struct {
 
 // Run checks if there's an activity coming up, and sends an announcement if it's the first one of the day
 func (r Reminder) Run() {
-	today := time.Now()
-
 	var activities pq.StringArray
 	err := r.State.DB.QueryRow("SELECT activities FROM schedules WHERE team = $1", r.Team.ID).Scan(&activities)
 	if err != nil {
@@ -49,17 +47,13 @@ func (r Reminder) Run() {
 	}
 	week := r.State.Schedules[spreadsheetID].Week
 
-	var done bool
+	today := time.Now()
 	for i, activity := range week.ActivitiesOn(week.Weekday(int(today.Weekday()))) {
-		if done {
-			break
-		} else if i != today.Hour()-15 {
+		if i != today.Hour()-15 {
 			continue
 		}
 		for _, reminder := range activities {
 			if activity == reminder {
-				done = true
-
 				announcement := fmt.Sprintf("%s in %d minutes", activity, 60-r.time)
 				if r.Config.RoleMention.Valid {
 					announcement = fmt.Sprintf("%s %s", r.Config.RoleMention.Value, announcement)
@@ -72,7 +66,7 @@ func (r Reminder) Run() {
 					announceLog += fmt.Sprintf("for %q", r.Team.Name)
 				}
 				log.Println(announceLog)
-				break
+				return
 			}
 		}
 	}
