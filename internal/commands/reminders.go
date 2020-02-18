@@ -24,6 +24,9 @@ func init() {
 
 	examples = [][2]string{{"!reminders_add activities Scrim", "Add \"Scrim\" to the activities list."}}
 	command.AddCommand("reminders_add", "Add an item to a field in the reminder config.", examples, RemindersAdd)
+
+	examples = [][2]string{{"!reminders_del activities Scrim", "Remove \"Scrim\" from the activities list."}}
+	command.AddCommand("reminders_del", "Remove an item from a field in the reminder config.", examples, RemindersDel)
 }
 
 // Reminders shows the reminder config for this team.
@@ -113,8 +116,11 @@ func RemindersSet(s *state.State, m *discordgo.MessageCreate, args []string) (st
 	return "Updated " + args[1] + ".", nil
 }
 
-// RemindersAdd adds an item to either activities or intervals in a team's config
-func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+type scheduleValid func(string, string) bool
+type intervalValid func(int64, int64) bool
+
+// remindersModifyField modifies one of the list fields on reminder config
+func remindersModifyField(s *state.State, m *discordgo.MessageCreate, args []string, sv scheduleValid, iv intervalValid) (string, error) {
 	t := s.FindTeam(m.GuildID, m.ChannelID)
 	if t.ID == 0 {
 		return "No team in this channel / guild.", nil
@@ -143,22 +149,23 @@ func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (st
 		if parseErr != nil {
 			return err.Error(), nil
 		}
-		var foundUnique bool
-		for _, activity := range activities {
-			dupe := false
-			for _, addedActivity := range config.Activities {
-				if activity == addedActivity {
+
+		startLen := len(config.Activities)
+		var dupe bool
+		for i := range activities {
+			dupe = false
+			for j := range config.Activities {
+				if sv(activities[i], config.Activities[j]) {
 					dupe = true
 					break
 				}
 			}
 			if !dupe {
-				config.Activities = append(config.Activities, activity)
-				foundUnique = true
+				config.Activities = append(config.Activities, activities[i])
 			}
 		}
-		if !foundUnique {
-			return "No new activities to add.", nil
+		if len(config.Activities) == startLen {
+			return "Nothing to change.", nil
 		}
 		_, err = s.DB.Exec("UPDATE reminders SET activities = $1 WHERE team = $2", config.Activities, t.ID)
 	case "intervals":
@@ -177,7 +184,7 @@ func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (st
 		for _, num := range nums {
 			dupe := false
 			for _, interval := range config.Intervals {
-				if num == interval {
+				if iv(num, interval) {
 					dupe = true
 					break
 				}
@@ -188,7 +195,7 @@ func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (st
 			}
 		}
 		if !foundUnique {
-			return "No new intervals to add.", nil
+			return "Nothing to change.", nil
 		}
 		_, err = s.DB.Exec("UPDATE reminders SET intervals = $1 WHERE team = $2", config.Intervals, t.ID)
 	default:
@@ -200,4 +207,22 @@ func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (st
 	}
 
 	return "Updated " + args[1] + ".", nil
+}
+
+// RemindersAdd adds an item to activities or intervals
+func RemindersAdd(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	return remindersModifyField(s, m, args, func(news, olds string) bool {
+		return news == olds
+	}, func(newi, oldi int64) bool {
+		return newi == oldi
+	})
+}
+
+// RemindersDel deletes an item from activities or intervals
+func RemindersDel(s *state.State, m *discordgo.MessageCreate, args []string) (string, error) {
+	return remindersModifyField(s, m, args, func(news, olds string) bool {
+		return news != olds
+	}, func(newi, oldi int64) bool {
+		return newi != oldi
+	})
 }
