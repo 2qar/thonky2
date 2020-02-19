@@ -3,7 +3,7 @@ module github.com/bigheadgeorge/thonky2
 go 1.13
 
 require (
-	github.com/bigheadgeorge/goverbuff v0.0.0-20191218165319-7248fa292bfb
+	github.com/bigheadgeorge/goverbuff v0.0.0-20200219035635-7d5592e4a0a6
 	github.com/bigheadgeorge/spreadsheet v0.0.0-20191122095212-08231195c43b
 	github.com/bwmarrin/discordgo v0.20.2
 	github.com/jmoiron/sqlx v1.2.0
